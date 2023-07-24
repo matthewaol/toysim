@@ -1,28 +1,44 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[43]:
+# In[34]:
 
 
 import pylab as plt 
 import numpy as np
-import scipy as sp 
+import scipy as sp
+
+from Bio.PDB.PDBParser import PDBParser
+
 # from IPython import embed;embed() <- can use this to make breakpoints 
 
 
-# In[44]:
+# In[35]:
+
+
+def get_xy_coords_pdb(file_name, structure_id): # Parses pdb file to get xy coordinates of atoms
+    parser = PDBParser(PERMISSIVE=1)
+    structure = parser.get_structure(structure_id,file_name)
+    
+    list_of_coords = [atom.get_coord() for atom in structure.get_atoms()]
+    
+    list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1))
+    return list_of_coords
+
+
+# In[36]:
 
 
 def create_q_vectors(image_size, step_size): # creates 2d array of q_vectors, can specify the step size between vectors
     q_vectors = [] # step_size can also be seen as the resolution of the image !
     
-    for x in plt.arange(-(image_size), image_size+.01, step_size): # can also use linspace instead of arange
-        for y in plt.arange(-(image_size), image_size+.01, step_size):  
+    for x in np.arange(-image_size, image_size+.01, step_size): # can also use linspace instead of arange
+        for y in np.arange(-image_size, image_size+.01, step_size):  
             q_vectors.append([x, y])
     return plt.array(q_vectors) 
 
 
-# In[45]:
+# In[37]:
 
 
 def create_Tu_vectors(Tu_size):
@@ -34,7 +50,7 @@ def create_Tu_vectors(Tu_size):
     return plt.array(Tu)
 
 
-# In[46]:
+# In[38]:
 
 
 def rotation_matrix(vector,theta): # takes in an atom vector and a theta value (rad), outputs vector that's rotated theta degrees cc
@@ -44,7 +60,7 @@ def rotation_matrix(vector,theta): # takes in an atom vector and a theta value (
     return rotated_atom
 
 
-# In[47]:
+# In[39]:
 
 
 # computing I
@@ -86,7 +102,7 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
     return i_real + i_imag*1j
 
 
-# In[48]:
+# In[40]:
 
 
 def lattice_transform(Q, Tu,theta): # takes in a single Q vector and a list of Tu vectors, outputs a single A value
@@ -124,7 +140,7 @@ def lattice_transform_no_loop_array(Qs, Tu, theta): # takes in an array of Q ins
     return i_real + i_imag * 1j
 
 
-# In[49]:
+# In[41]:
 
 
 def get_I_values(Qs, Atoms, Tu, f_j, theta): # calculating the lattice and molecular transforms and returning intensities
@@ -155,7 +171,7 @@ def get_I_values_no_loop(Qs, Atoms, Tu, f_j, theta):
     return a_total.real**2 + a_total.imag**2
 
 
-# In[51]:
+# In[42]:
 
 
 def add_background_exp(I_list, Qs, a): #add background based on exponential decay
@@ -169,14 +185,14 @@ def add_background_exp(I_list, Qs, a): #add background based on exponential deca
     return np.array(background_list) * I_list
 
 
-# In[29]:
+# In[43]:
 
 
-def add_background_offset(I_list,Qs,a): # adds constant offset to I_list
+def add_background_offset(I_list,a): # adds constant offset to I_list
     return I_list + a
 
 
-# In[30]:
+# In[44]:
 
 
 def add_background_gaussian(I_list, mu, sigma): # adds gaussian background to I_list / increase sigma for more background
@@ -184,7 +200,7 @@ def add_background_gaussian(I_list, mu, sigma): # adds gaussian background to I_
     return I_list + gaussian_background_list 
 
 
-# In[31]:
+# In[45]:
 
 
 def add_background_cauchy(I_list): #doesnt work yet
@@ -192,7 +208,7 @@ def add_background_cauchy(I_list): #doesnt work yet
     return cauchy_list + I_list
 
 
-# In[32]:
+# In[46]:
 
 
 def show_image(list_of_I_values): # produces image of the resulting array of I values
@@ -207,7 +223,7 @@ def show_image(list_of_I_values): # produces image of the resulting array of I v
     plt.show()
 
 
-# In[33]:
+# In[47]:
 
 
 def add_gaussian_noise(I_list, mu, sigma): # returns the list of I's with gaussian noise multiplied into it 
@@ -216,7 +232,7 @@ def add_gaussian_noise(I_list, mu, sigma): # returns the list of I's with gaussi
     return noisy_I_list 
 
 
-# In[34]:
+# In[48]:
 
 
 def add_poisson_noise(I_list,lam): # returns the list of I's with poisson noise multiplied into it 
@@ -225,7 +241,7 @@ def add_poisson_noise(I_list,lam): # returns the list of I's with poisson noise 
     return noisy_I_list
 
 
-# In[35]:
+# In[49]:
 
 
 def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt+pepper scattered in it randomly
@@ -240,10 +256,22 @@ def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt
     return I_list
 
 
-# In[36]:
+# In[50]:
 
 
-image_size = 15 # Parameter - Image Size (for now = 40)
+# find num of spots using ndimage: label and find_objects
+def count_spots(I_list,square_I_list): # returns num of peaks and slices indicating the location of peaks
+    threshold = square_I_list > I_list.max() * .05 # Threshold is the upper 95% of data
+    labels, num_of_labels = sp.ndimage.label(threshold) # Label each index of intensity array based on our defined threshold
+    peaks = sp.ndimage.find_objects(labels) # gets tuples corresponding to the location of each peak
+    print("Number of spots: " + str(num_of_labels)) 
+    return num_of_labels, peaks
+
+
+# In[51]:
+
+
+image_size = 10 # Parameter - Image Size (for now = 40) 
 image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
 Qs = create_q_vectors(image_size, image_resolution)
@@ -252,6 +280,8 @@ Qs_size = int(plt.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 ->
 Qs_len = len(Qs)
 
 Atoms = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+molecule = get_xy_coords_pdb("4bs7.pdb", "4bs7")
+
 f_j = 1
 
 Tu_size = 15 # Parameter - Tu Vectors size 
@@ -260,44 +290,28 @@ Tu = create_Tu_vectors(Tu_size)
 degrees = 0
 theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-a = .0 # Parameter - value for the background, decent results are between .001 to .009
+a = 0 # Parameter - value for the background, decent results are between .001 to .009
 
-I_list = get_I_values_no_loop(Qs, Atoms,Tu,f_j,theta) # Computing intensity values
+I_list = get_I_values_no_loop(Qs, Atoms, Tu, f_j,theta) # Computing intensity values
+
+I_list = add_background_exp(I_list,Qs,a)
 
 square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
 
-
-# In[37]:
-
-
-def count_spots(I_list,Qs): # finding the spots, or peaks
-    ...
-
-peaks, _  = sp.signal.find_peaks(I_list, height=10000, prominence = 2) 
-peaks
-len(peaks)
-
-plt.plot(I_list, label='I_list')
-plt.plot(peaks, I_list[peaks], 'x', color='red', label='Peaks')
-plt.legend()
-plt.show()
-
-print(len(peaks))
-
-print("I_list max: " + str(I_list.max()))
-print("I_list std: " + str(I_list.std()))
-print("I_list mean: " + str(I_list.mean()))
+spot_count = count_spots(I_list, square_I_list)
 
 
-# In[38]:
+# In[52]:
 
 
 show_image(square_I_list)
 plt.imshow(square_I_list)
+
+print("Without vmax and vmin specified: ")
 plt.draw()
 
 
-# In[42]:
+# In[53]:
 
 
 # Background movie! going from a = 0 to 0.06 in steps of .001
@@ -308,20 +322,20 @@ plt.draw()
 #     show_image(square_I_list)
 
 
-# In[40]:
+# # In[54]:
 
 
-# Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
-for i in np.arange(10): 
-    degrees = 10 * i * np.pi / 180
-    img = get_I_values(Qs,Atoms,Tu,1,degrees)
-    square_I_list = plt.reshape(img, (Qs_size,Qs_size)) 
-    plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
-    plt.draw
-    plt.pause(.5)
+# # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
+# for i in np.arange(10): 
+#     degrees = 10 * i * np.pi / 180
+#     img = get_I_values(Qs,Atoms,Tu,1,degrees)
+#     square_I_list = plt.reshape(img, (Qs_size,Qs_size)) 
+#     plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
+#     plt.draw
+#     plt.pause(.5)
 
 
-# In[ ]:
+# In[55]:
 
 
 #Trying to add noise : have gaussian, poisson, saltpepper so far
@@ -335,7 +349,7 @@ noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
 #saltpepper_I_list = add_saltpepper_noise(I_list, noise_intensity) # for some reason this keeps applying to the og list
 
 
-# In[ ]:
+# In[56]:
 
 
 # print("Size of image is " + str(Qs_size) + " by " + str(Qs_size))
