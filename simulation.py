@@ -267,7 +267,29 @@ def count_spots(I_list,square_I_list): # returns num of peaks and slices indicat
     print("Number of spots: " + str(num_of_labels)) 
     return num_of_labels, peaks
 
+def produce_image(pdb_file_name, Qs, a, degrees): 
+    
+    f_j = 1
+    Tu_size = 15 
+    Tu = create_Tu_vectors(Tu_size)
+    
+    theta = degrees * np.pi / 180
+    molecule = get_xy_coords_pdb(pdb_file_name, "temporary_id")
+    
+    I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta)
+    I_list_background = add_background_exp(I_list,Qs,a)
+    
+    I_list_size = int(np.sqrt(len(I_list)))
+    
+    square_I_list = plt.reshape(I_list_background, (I_list_size,I_list_size) )
+    
+    return square_I_list
 
+# example use case
+Qs = create_q_vectors(30,.1)
+image = produce_image("4bs7.pdb", Qs, .004, 0)
+
+plt.imshow(image, vmax=1e7)
 # In[51]:
 
 
