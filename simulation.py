@@ -16,14 +16,17 @@ from Bio.PDB.PDBParser import PDBParser
 # In[35]:
 
 
-def get_xy_coords_pdb(file_name, structure_id): # Parses pdb file to get xy coordinates of atoms
+def get_coords_pdb(file_name, structure_id,get_only_xy=True):# Parses pdb file to get xy coordinates of atoms
+    print("Getting atom coordinates from molecule")
     parser = PDBParser(PERMISSIVE=1)
     structure = parser.get_structure(structure_id,file_name)
     
     list_of_coords = [atom.get_coord() for atom in structure.get_atoms()]
     
-    #list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1)) # comment out line for xyz coords
-    return list_of_coords
+    if get_only_xy is True: 
+        list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1))
+        
+    return np.array(list_of_coords)
 
 
 # In[36]:
@@ -50,33 +53,25 @@ def create_q_vectors_3d(image_size, step_size): # creates 2d array of q_vectors,
 # In[37]:
 
 
-def create_Tu_vectors(Tu_size):
+def create_Tu_vectors(num_cells, cell_size=1): 
     Tu = []
     
-    for i in range(Tu_size): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
-        for j in range(Tu_size):
-            Tu.append([i,j])
-    return plt.array(Tu)
-
-def create_Tu_vectors_3d(Tu_size): 
-    Tu = []
-    
-    for x in range(Tu_size): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
-        for y in range(Tu_size):
-                for z in range(Tu_size):
-                    Tu.append([x,y,z])
+    for x in range(num_cells):
+        for y in range(num_cells):
+            Tu.append([x * cell_size, y * cell_size])
     return np.array(Tu)
 
+def create_Tu_vectors_3d(num_cells, cell_size=1): 
+    Tu = []
+    
+    for x in range(num_cells): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
+        for y in range(num_cells):
+                for z in range(num_cells):
+                    Tu.append([x*cell_size,y*cell_size,z*cell_size])
+    return np.array(Tu)
 
-# In[38]:
-
-
-def rotation_matrix(vector,theta): # takes in an atom vector and a theta value (rad), outputs vector that's rotated theta degrees cc
-    x_comp, y_comp = vector[0], vector[1]
-    rotated_atom = [np.cos(theta)*x_comp - np.sin(theta)*y_comp,
-             np.sin(theta)*x_comp + np.cos(theta)*y_comp]
-    return rotated_atom
-
+def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
+    return sp.spatial.distance.pdist(atoms).max()
 
 # In[39]:
 
@@ -316,14 +311,13 @@ def count_spots(I_list,square_I_list): # returns num of peaks and slices indicat
     print("Number of spots: " + str(num_of_labels)) 
     return num_of_labels, peaks
 
-def produce_image(pdb_file_name, Qs, a, degrees): 
+def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees): 
     
     f_j = 1
-    Tu_size = 15 
-    Tu = create_Tu_vectors(Tu_size)
+    Tu = create_Tu_vectors(num_cells,cell_size)
     
     theta = degrees * np.pi / 180
-    molecule = get_xy_coords_pdb(pdb_file_name, "temporary_id")
+    molecule = get_coords_pdb(pdb_file_name, "temporary_id")
     
     I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta)
     I_list_background = add_background_exp(I_list,Qs,a)
@@ -337,53 +331,52 @@ def produce_image(pdb_file_name, Qs, a, degrees):
 # In[51]:
 
 # 3D sim
-print("Starting 3D simulation")
-alpha = 0 * np.pi / 180 
+# print("Starting 3D simulation")
+# alpha = 0 * np.pi / 180 
 
-rotat_mat = [[1,0,0],
-            [0,np.cos(alpha),np.sin(alpha)],
-            [0, -np.sin(alpha), np.cos(alpha)]]
+# rotat_mat = [[1,0,0],
+#             [0,np.cos(alpha),np.sin(alpha)],
+#             [0, -np.sin(alpha), np.cos(alpha)]]
 
-Qs = create_q_vectors_3d(4,.2)
-Tu = create_Tu_vectors_3d(4)
+# Qs = create_q_vectors_3d(4,.2)
+# Tu = create_Tu_vectors_3d(4)
 
-sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
+# sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
 
-I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
+# I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
 
-I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
-cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
+# I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
+# cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
 
-z_axis = 6
-square_I_list = cube_I_list[:,:,z_axis]
+# z_axis = 6
+# square_I_list = cube_I_list[:,:,z_axis]
 
-plt.imshow(square_I_list)
-plt.show()
+# plt.imshow(square_I_list)
+# plt.show()
 
 # 2D sim
 print("Starting 2D simulation")
-image_size = 10 # Parameter - Image Size (for now = 40) 
+image_size = 20 # Parameter - Image Size (for now = 40) 
 image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
 Qs = create_q_vectors(image_size, image_resolution)
 
 Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
-Qs_len = len(Qs)
 
-Atoms = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
-molecule = get_xy_coords_pdb("4bs7.pdb", "4bs7")
+triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+molecule = get_coords_pdb("4bs7.pdb", "4bs7")
 
 f_j = 1
 
-Tu_size = 15 # Parameter - Tu Vectors size 
-Tu = create_Tu_vectors(Tu_size)
+num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
+Tu = create_Tu_vectors(num_cells,cell_size)
 
 degrees = 0
 theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
 a = 0 # Parameter - value for the background, decent results are between .001 to .009
 
-I_list = get_I_values_no_loop(Qs, Atoms, Tu, f_j,theta) # Computing intensity values
+I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
 I_list = add_background_exp(I_list,Qs,a)
 
@@ -391,8 +384,7 @@ square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a s
 
 spot_count = count_spots(I_list, square_I_list)
 
-# show_image(square_I_list)
-
+show_image(square_I_list)
 
 # In[53]:
 
