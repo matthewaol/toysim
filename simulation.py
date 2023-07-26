@@ -16,7 +16,16 @@ from Bio.PDB.PDBParser import PDBParser
 # In[35]:
 
 
-def get_coords_pdb(file_name, structure_id,get_only_xy=True):# Parses pdb file to get xy coordinates of atoms
+def get_coords_pdb(file_name, structure_id,get_only_xy=True):
+    '''
+    Gets atom coordinates from a .pdb file
+    Parameters: 
+        file_name: string path to file
+        structure_id: string id of structure
+        get_only_xy: Assign false if xyz coordinates are needed 
+    Returns:
+        numpy array of atom coordinates 
+    '''
     print("Getting atom coordinates from molecule")
     parser = PDBParser(PERMISSIVE=1)
     structure = parser.get_structure(structure_id,file_name)
@@ -45,8 +54,7 @@ def create_q_vectors_3d(image_size, step_size): # creates 2d array of q_vectors,
     
     for x in np.arange(-image_size, image_size+.01, step_size): # can also use linspace instead of arange
         for y in np.arange(-image_size, image_size+.01, step_size):  
-                for z in np.arange(-image_size, image_size+.01, step_size):
-                    q_vectors.append([x, y, z])
+                q_vectors.append([x, y, np.sqrt(x**2 + y**2)])
     return np.array(q_vectors) 
 
 
@@ -73,7 +81,7 @@ def create_Tu_vectors_3d(num_cells, cell_size=1):
 def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
     return sp.spatial.distance.pdist(atoms).max()
 
-def create_Tu_vectors_t(num_cells,a,c):
+def create_Tu_vectors_t(num_cells,a,c): 
     Tu = []
 
     for x in range(num_cells):
@@ -125,6 +133,10 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
 def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Qs will be 3d and theta will be a matrix
     a = b = 0 
     
+    Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
+    exp_arg = Qs_mag**2 / 16 / np.pi**2 * -10.7
+    f_j = 7 * np.exp(exp_arg)
+
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
     
@@ -284,7 +296,6 @@ def add_gaussian_noise(I_list, mu, sigma): # returns the list of I's with gaussi
     return noisy_I_list 
 
 
-# In[48]:
 
 
 def add_poisson_noise(I_list,lam): # returns the list of I's with poisson noise multiplied into it 
@@ -293,7 +304,6 @@ def add_poisson_noise(I_list,lam): # returns the list of I's with poisson noise 
     return noisy_I_list
 
 
-# In[49]:
 
 
 def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt+pepper scattered in it randomly
@@ -306,9 +316,6 @@ def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt
         rand_index = rng.choice(pixel_values,replace=False) #random generated number with the range of the I_list size 
         I_list[rand_index] = rng.choice(black_or_white)
     return I_list
-
-
-# In[50]:
 
 
 # find num of spots using ndimage: label and find_objects
@@ -338,63 +345,59 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
 
 if __name__ == '__main__':
     # 3D sim
-    # print("Starting 3D simulation")
-    # alpha = 0 * np.pi / 180 
+    print("Starting 3D simulation")
+    alpha = 0 * np.pi / 180 
 
-    # rotat_mat = [[1,0,0],
-    #             [0,np.cos(alpha),np.sin(alpha)],
-    #             [0, -np.sin(alpha), np.cos(alpha)]]
+    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    rotat_mat = rand_rot_mat.as_matrix()[0]
 
-    # Qs = create_q_vectors_3d(4,.2)
-    # Tu = create_Tu_vectors_3d(4)
+    sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    # sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
+    Qs = create_q_vectors_3d(10,.2)
+    Tu = create_Tu_vectors_3d(5, determine_cell_size(sample_atoms))
 
-    # I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
 
-    # I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
-    # cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
+    I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
 
-    # z_axis = 6
-    # square_I_list = cube_I_list[:,:,z_axis]
+    I_size = int(np.sqrt(len(I_list)))
+    square_I_list = np.reshape(I_list, (I_size, I_size))
 
-    # plt.imshow(square_I_list)
-    # plt.show()
+    z_axis = 20
+
+    plt.imshow(square_I_list, vmax=1e6)
+    plt.show()
 
     # 2D sim
-    print("Starting 2D simulation")
-    image_size = 20 # Parameter - Image Size (for now = 40) 
-    image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
+    # print("Starting 2D simulation")
+    # image_size = 20 # Parameter - Image Size (for now = 40) 
+    # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
-    Qs = create_q_vectors(image_size, image_resolution)
+    # Qs = create_q_vectors(image_size, image_resolution)
 
-    Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
+    # Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
 
-    triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
-    molecule = get_coords_pdb("4bs7.pdb", "4bs7")
+    # triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+    # molecule = get_coords_pdb("4bs7.pdb", "4bs7")
 
-    f_j = 1
+    # f_j = 1
 
-    num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
-    Tu = create_Tu_vectors(num_cells,cell_size)
+    # num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
+    # Tu = create_Tu_vectors(num_cells,cell_size)
 
-    degrees = 0
-    theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
+    # degrees = 0
+    # theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-    a = 0 # Parameter - value for the background, decent results are between .001 to .009
+    # a = 0 # Parameter - value for the background, decent results are between .001 to .009
 
-    I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
+    # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
-    I_list = add_background_exp(I_list,Qs,a)
+    # I_list = add_background_exp(I_list,Qs,a)
 
-    square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
+    # square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
 
-    spot_count = count_spots(I_list, square_I_list)
+    # spot_count = count_spots(I_list, square_I_list)
 
-    show_image(square_I_list)
-
-    # In[53]:
-
+    # show_image(square_I_list)
 
     # Background movie! going from a = 0 to 0.06 in steps of .001
     # for i in np.arange(0,.06,.001):
