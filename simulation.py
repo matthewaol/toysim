@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[34]:
-
-
 import pylab as plt 
 import numpy as np
 import scipy as sp
@@ -11,10 +8,6 @@ import scipy as sp
 from Bio.PDB.PDBParser import PDBParser
 
 # from IPython import embed;embed() <- can use this to make breakpoints 
-
-
-# In[35]:
-
 
 def get_coords_pdb(file_name, structure_id,get_only_xy=True):
     '''
@@ -37,30 +30,40 @@ def get_coords_pdb(file_name, structure_id,get_only_xy=True):
         
     return np.array(list_of_coords)
 
-
-# In[36]:
-
-
-def create_q_vectors(image_size, step_size): # creates 2d array of q_vectors, can specify the step size between vectors
-    q_vectors = [] # step_size can also be seen as the resolution of the image !
+def show_image(square_I_list): 
+    '''
+    Displays a square 2D array of values as an a image and uses its mean and std to determine vmax and vmin 
+    Parameters:
+        square_I_list: 2D reshaped array of image values
+    '''
+    print("Showing Image")
+    mean = square_I_list.mean()
+    std = square_I_list.std()
     
-    for x in np.arange(-image_size, image_size+.01, step_size): # can also use linspace instead of arange
+    vmin = mean - std
+    vmax = mean + std 
+    
+    photo = plt.imshow(square_I_list, vmax = vmax, vmin = vmin)
+    plt.show()
+
+# Q-vector functions
+def create_q_vectors(image_size, step_size):
+    q_vectors = [] 
+    
+    for x in np.arange(-image_size, image_size+.01, step_size): 
         for y in np.arange(-image_size, image_size+.01, step_size):  
             q_vectors.append([x, y])
     return plt.array(q_vectors) 
 
-def create_q_vectors_3d(image_size, step_size): # creates 2d array of q_vectors, can specify the step size between vectors
-    q_vectors = [] # step_size can also be seen as the resolution of the image !
+def create_q_vectors_3d(image_size, step_size): 
+    q_vectors = [] 
     
-    for x in np.arange(-image_size, image_size+.01, step_size): # can also use linspace instead of arange
+    for x in np.arange(-image_size, image_size+.01, step_size): 
         for y in np.arange(-image_size, image_size+.01, step_size):  
                 q_vectors.append([x, y, np.sqrt(x**2 + y**2)])
-    return np.array(q_vectors) 
-
-
-# In[37]:
-
-
+    return np.array(q_vectors)
+ 
+# Lattice function
 def create_Tu_vectors(num_cells, cell_size=1): 
     Tu = []
     
@@ -89,10 +92,7 @@ def create_Tu_vectors_t(num_cells,a,c):
             for z in range(num_cells):
                 Tu.append([x*a, y*a, y*c])
 
-# In[39]:
-
-
-# computing I
+# Molecular Transform functions
 def molecular_transform(Q, Atoms,f_j,theta): # takes in a single Q vector and a list of atoms, outputs a single A value
     a = b = 0
     
@@ -146,10 +146,7 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Q
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
 
-
-# In[40]:
-
-
+# Lattice transform functions
 def lattice_transform(Q, Tu,theta): # takes in a single Q vector and a list of Tu vectors, outputs a single A value
     a = b = 0 
     
@@ -193,9 +190,7 @@ def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes 
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
-# In[41]:
-
-
+# Complete transform functions
 def get_I_values(Qs, Atoms, Tu, f_j, theta): # calculating the lattice and molecular transforms and returning intensities
     
     print("Computing intensities")
@@ -234,10 +229,7 @@ def get_I_values_no_loop_3d(Qs, Atoms, Tu, f_j, rotation_m):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
-
-# In[42]:
-
-
+# Background functions
 def add_background_exp(I_list, Qs, a): #add background based on exponential decay
     background_list = []
     
@@ -248,63 +240,27 @@ def add_background_exp(I_list, Qs, a): #add background based on exponential deca
         
     return np.array(background_list) * I_list
 
-
-# In[43]:
-
-
 def add_background_offset(I_list,a): # adds constant offset to I_list
     return I_list + a
-
-
-# In[44]:
-
 
 def add_background_gaussian(I_list, mu, sigma): # adds gaussian background to I_list / increase sigma for more background
     gaussian_background_list = np.random.default_rng().normal(mu,sigma,len(I_list))
     return I_list + gaussian_background_list 
 
-
-# In[45]:
-
-
 def add_background_cauchy(I_list): #doesnt work yet
     cauchy_list = np.random.default_rng().standard_cauchy(len(I_list))
     return cauchy_list + I_list
 
-
-# In[46]:
-
-
-def show_image(list_of_I_values): # produces image of the resulting array of I values
-    print("Showing Image")
-    mean = list_of_I_values.mean()
-    std = list_of_I_values.std()
-    
-    vmin = mean - std
-    vmax = mean + std 
-    
-    photo = plt.imshow(list_of_I_values, vmax = vmax, vmin = vmin)
-    plt.show()
-
-
-# In[47]:
-
-
+# Noise functions
 def add_gaussian_noise(I_list, mu, sigma): # returns the list of I's with gaussian noise multiplied into it 
     gaussian_array = np.random.default_rng().normal(mu, sigma, len(I_list)) 
     noisy_I_list = I_list * gaussian_array
     return noisy_I_list 
 
-
-
-
 def add_poisson_noise(I_list,lam): # returns the list of I's with poisson noise multiplied into it 
     poisson_array = np.random.default_rng().poisson(lam, len(I_list))
     noisy_I_list = I_list * poisson_array
     return noisy_I_list
-
-
-
 
 def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt+pepper scattered in it randomly
     
@@ -317,8 +273,6 @@ def add_saltpepper_noise(I_list,noise_level): #returns the list of I's with salt
         I_list[rand_index] = rng.choice(black_or_white)
     return I_list
 
-
-# find num of spots using ndimage: label and find_objects
 def count_spots(I_list,square_I_list): # returns num of peaks and slices indicating the location of peaks
     threshold = square_I_list > I_list.max() * .05 # Threshold is the upper 95% of data
     labels, num_of_labels = sp.ndimage.label(threshold) # Label each index of intensity array based on our defined threshold
@@ -406,10 +360,6 @@ if __name__ == '__main__':
     #     square_I_list = plt.reshape(I_background_list, (Qs_size,Qs_size))
     #     show_image(square_I_list)
 
-
-    # # In[54]:
-
-
     # # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
     # for i in np.arange(10): 
     #     degrees = 10 * i * np.pi / 180
@@ -418,10 +368,6 @@ if __name__ == '__main__':
     #     plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
     #     plt.draw
     #     plt.pause(.5)
-
-
-    # In[55]:
-
 
     #Trying to add noise : have gaussian, poisson, saltpepper so far
     #mu, sigma = 0, .1 # where mu = mean, and sigma = standard deviation (sigma !< 0)
@@ -432,10 +378,6 @@ if __name__ == '__main__':
 
     #noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
     #saltpepper_I_list = add_saltpepper_noise(I_list, noise_intensity) # for some reason this keeps applying to the og list
-
-
-    # In[56]:
-
 
     # print("Size of image is " + str(Qs_size) + " by " + str(Qs_size))
     # print("Length of Qs is: " + str(Qs_len))
