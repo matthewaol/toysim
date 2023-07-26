@@ -73,6 +73,14 @@ def create_Tu_vectors_3d(num_cells, cell_size=1):
 def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
     return sp.spatial.distance.pdist(atoms).max()
 
+def create_Tu_vectors_t(num_cells,a,c):
+    Tu = []
+
+    for x in range(num_cells):
+        for y in range(num_cells):
+            for z in range(num_cells):
+                Tu.append([x*a, y*a, y*c])
+
 # In[39]:
 
 
@@ -328,108 +336,107 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
     
     return square_I_list
 
-# In[51]:
+if __name__ == '__main__':
+    # 3D sim
+    # print("Starting 3D simulation")
+    # alpha = 0 * np.pi / 180 
 
-# 3D sim
-# print("Starting 3D simulation")
-# alpha = 0 * np.pi / 180 
+    # rotat_mat = [[1,0,0],
+    #             [0,np.cos(alpha),np.sin(alpha)],
+    #             [0, -np.sin(alpha), np.cos(alpha)]]
 
-# rotat_mat = [[1,0,0],
-#             [0,np.cos(alpha),np.sin(alpha)],
-#             [0, -np.sin(alpha), np.cos(alpha)]]
+    # Qs = create_q_vectors_3d(4,.2)
+    # Tu = create_Tu_vectors_3d(4)
 
-# Qs = create_q_vectors_3d(4,.2)
-# Tu = create_Tu_vectors_3d(4)
+    # sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
 
-# sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
+    # I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
 
-# I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
+    # I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
+    # cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
 
-# I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
-# cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
+    # z_axis = 6
+    # square_I_list = cube_I_list[:,:,z_axis]
 
-# z_axis = 6
-# square_I_list = cube_I_list[:,:,z_axis]
+    # plt.imshow(square_I_list)
+    # plt.show()
 
-# plt.imshow(square_I_list)
-# plt.show()
+    # 2D sim
+    print("Starting 2D simulation")
+    image_size = 20 # Parameter - Image Size (for now = 40) 
+    image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
-# 2D sim
-print("Starting 2D simulation")
-image_size = 20 # Parameter - Image Size (for now = 40) 
-image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
+    Qs = create_q_vectors(image_size, image_resolution)
 
-Qs = create_q_vectors(image_size, image_resolution)
+    Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
 
-Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
+    triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+    molecule = get_coords_pdb("4bs7.pdb", "4bs7")
 
-triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
-molecule = get_coords_pdb("4bs7.pdb", "4bs7")
+    f_j = 1
 
-f_j = 1
+    num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
+    Tu = create_Tu_vectors(num_cells,cell_size)
 
-num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
-Tu = create_Tu_vectors(num_cells,cell_size)
+    degrees = 0
+    theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-degrees = 0
-theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
+    a = 0 # Parameter - value for the background, decent results are between .001 to .009
 
-a = 0 # Parameter - value for the background, decent results are between .001 to .009
+    I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
-I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
+    I_list = add_background_exp(I_list,Qs,a)
 
-I_list = add_background_exp(I_list,Qs,a)
+    square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
 
-square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
+    spot_count = count_spots(I_list, square_I_list)
 
-spot_count = count_spots(I_list, square_I_list)
+    show_image(square_I_list)
 
-show_image(square_I_list)
-
-# In[53]:
-
-
-# Background movie! going from a = 0 to 0.06 in steps of .001
-# for i in np.arange(0,.06,.001):
-#     a = i 
-#     I_background_list = add_background_exp(I_list,Qs,a)
-#     square_I_list = plt.reshape(I_background_list, (Qs_size,Qs_size))
-#     show_image(square_I_list)
+    # In[53]:
 
 
-# # In[54]:
+    # Background movie! going from a = 0 to 0.06 in steps of .001
+    # for i in np.arange(0,.06,.001):
+    #     a = i 
+    #     I_background_list = add_background_exp(I_list,Qs,a)
+    #     square_I_list = plt.reshape(I_background_list, (Qs_size,Qs_size))
+    #     show_image(square_I_list)
 
 
-# # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
-# for i in np.arange(10): 
-#     degrees = 10 * i * np.pi / 180
-#     img = get_I_values(Qs,Atoms,Tu,1,degrees)
-#     square_I_list = plt.reshape(img, (Qs_size,Qs_size)) 
-#     plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
-#     plt.draw
-#     plt.pause(.5)
+    # # In[54]:
 
 
-# In[55]:
+    # # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
+    # for i in np.arange(10): 
+    #     degrees = 10 * i * np.pi / 180
+    #     img = get_I_values(Qs,Atoms,Tu,1,degrees)
+    #     square_I_list = plt.reshape(img, (Qs_size,Qs_size)) 
+    #     plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
+    #     plt.draw
+    #     plt.pause(.5)
 
 
-#Trying to add noise : have gaussian, poisson, saltpepper so far
-#mu, sigma = 0, .1 # where mu = mean, and sigma = standard deviation (sigma !< 0)
-#gaussian_I_list = add_gaussian_noise(I_list,mu,sigma)
-
-#lam = 1 # where lam = average occurences of event within given timeframe
-#poisson_I_list = add_poisson_noise(I_list,lam) 
-
-#noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
-#saltpepper_I_list = add_saltpepper_noise(I_list, noise_intensity) # for some reason this keeps applying to the og list
+    # In[55]:
 
 
-# In[56]:
+    #Trying to add noise : have gaussian, poisson, saltpepper so far
+    #mu, sigma = 0, .1 # where mu = mean, and sigma = standard deviation (sigma !< 0)
+    #gaussian_I_list = add_gaussian_noise(I_list,mu,sigma)
+
+    #lam = 1 # where lam = average occurences of event within given timeframe
+    #poisson_I_list = add_poisson_noise(I_list,lam) 
+
+    #noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
+    #saltpepper_I_list = add_saltpepper_noise(I_list, noise_intensity) # for some reason this keeps applying to the og list
 
 
-# print("Size of image is " + str(Qs_size) + " by " + str(Qs_size))
-# print("Length of Qs is: " + str(Qs_len))
-# print("Gaussian Noise: " + "mu = " + str(mu) + " & sigma = " + str(sigma))
-# print("Poisson Noise: " + "lam = " + str(lam))
-# print("Salt and Pepper Noise: " + "Noise intensity = " + str(noise_intensity))
+    # In[56]:
+
+
+    # print("Size of image is " + str(Qs_size) + " by " + str(Qs_size))
+    # print("Length of Qs is: " + str(Qs_len))
+    # print("Gaussian Noise: " + "mu = " + str(mu) + " & sigma = " + str(sigma))
+    # print("Poisson Noise: " + "lam = " + str(lam))
+    # print("Salt and Pepper Noise: " + "Noise intensity = " + str(noise_intensity))
 
