@@ -22,7 +22,7 @@ def get_xy_coords_pdb(file_name, structure_id): # Parses pdb file to get xy coor
     
     list_of_coords = [atom.get_coord() for atom in structure.get_atoms()]
     
-    list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1))
+    #list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1)) # comment out line for xyz coords
     return list_of_coords
 
 
@@ -37,6 +37,15 @@ def create_q_vectors(image_size, step_size): # creates 2d array of q_vectors, ca
             q_vectors.append([x, y])
     return plt.array(q_vectors) 
 
+def create_q_vectors_3d(image_size, step_size): # creates 2d array of q_vectors, can specify the step size between vectors
+    q_vectors = [] # step_size can also be seen as the resolution of the image !
+    
+    for x in np.arange(-image_size, image_size+.01, step_size): # can also use linspace instead of arange
+        for y in np.arange(-image_size, image_size+.01, step_size):  
+                for z in np.arange(-image_size, image_size+.01, step_size):
+                    q_vectors.append([x, y, z])
+    return np.array(q_vectors) 
+
 
 # In[37]:
 
@@ -48,6 +57,15 @@ def create_Tu_vectors(Tu_size):
         for j in range(Tu_size):
             Tu.append([i,j])
     return plt.array(Tu)
+
+def create_Tu_vectors_3d(Tu_size): 
+    Tu = []
+    
+    for x in range(Tu_size): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
+        for y in range(Tu_size):
+                for z in range(Tu_size):
+                    Tu.append([x,y,z])
+    return np.array(Tu)
 
 
 # In[38]:
@@ -101,6 +119,18 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
 
+def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Qs will be 3d and theta will be a matrix
+    a = b = 0 
+    
+    rotated_u = np.dot(rotation_m, Atoms.T)
+    phase = np.dot(Qs, rotated_u)
+    
+    a = np.sum(np.cos(phase), axis = 1)
+    b = np.sum(np.sin(phase), axis = 1) 
+    
+    i_real, i_imag = a*f_j, b*f_j
+    return i_real + i_imag*1j
+
 
 # In[40]:
 
@@ -139,6 +169,14 @@ def lattice_transform_no_loop_array(Qs, Tu, theta): # takes in an array of Q ins
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
+def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes in rotation matrix    
+    rotated_u = np.dot(rotation_m,Tu.T) 
+    phase = np.dot(Qs, rotated_u)  
+    a = np.sum(np.cos(phase), axis = 1) # indicating axis = 1, to sum over the columns instead of rows
+    b = np.sum(np.sin(phase), axis = 1)
+
+    i_real, i_imag = a, b
+    return i_real + i_imag * 1j
 
 # In[41]:
 
@@ -165,6 +203,17 @@ def get_I_values_no_loop(Qs, Atoms, Tu, f_j, theta):
     
     a_molecular = molecular_transform_no_loop_array(Qs, Atoms, f_j, theta)
     a_lattice = lattice_transform_no_loop_array(Qs, Tu, theta)
+    a_total = a_molecular * a_lattice
+    
+    print("Finished intensities")
+    return a_total.real**2 + a_total.imag**2
+
+def get_I_values_no_loop_3d(Qs, Atoms, Tu, f_j, rotation_m): 
+    
+    print("Computing intensities")
+    
+    a_molecular = molecular_transform_no_loop_array_3d(Qs, Atoms, f_j, rotation_m)
+    a_lattice = lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m)
     a_total = a_molecular * a_lattice
     
     print("Finished intensities")
@@ -285,20 +334,40 @@ def produce_image(pdb_file_name, Qs, a, degrees):
     
     return square_I_list
 
-# example use case
-Qs = create_q_vectors(30,.1)
-image = produce_image("4bs7.pdb", Qs, .004, 0)
-
-plt.imshow(image, vmax=1e7)
 # In[51]:
 
+# 3D sim
+print("Starting 3D simulation")
+alpha = 0 * np.pi / 180 
 
+rotat_mat = [[1,0,0],
+            [0,np.cos(alpha),np.sin(alpha)],
+            [0, -np.sin(alpha), np.cos(alpha)]]
+
+Qs = create_q_vectors_3d(4,.2)
+Tu = create_Tu_vectors_3d(4)
+
+sample_atoms = np.array(get_xy_coords_pdb("4bs7.pdb", "temp"))
+
+I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
+
+I_size = int(round(len(I_list) ** (1/3))) # instead of sqrt, cube root
+cube_I_list = np.reshape(I_list, (I_size, I_size, I_size)) # shape into a cube 
+
+z_axis = 6
+square_I_list = cube_I_list[:,:,z_axis]
+
+plt.imshow(square_I_list)
+plt.show()
+
+# 2D sim
+print("Starting 2D simulation")
 image_size = 10 # Parameter - Image Size (for now = 40) 
 image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
 Qs = create_q_vectors(image_size, image_resolution)
 
-Qs_size = int(plt.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
+Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
 Qs_len = len(Qs)
 
 Atoms = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
@@ -322,15 +391,7 @@ square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a s
 
 spot_count = count_spots(I_list, square_I_list)
 
-
-# In[52]:
-
-
-show_image(square_I_list)
-plt.imshow(square_I_list)
-
-print("Without vmax and vmin specified: ")
-plt.draw()
+# show_image(square_I_list)
 
 
 # In[53]:
@@ -361,13 +422,13 @@ plt.draw()
 
 
 #Trying to add noise : have gaussian, poisson, saltpepper so far
-mu, sigma = 0, .1 # where mu = mean, and sigma = standard deviation (sigma !< 0)
+#mu, sigma = 0, .1 # where mu = mean, and sigma = standard deviation (sigma !< 0)
 #gaussian_I_list = add_gaussian_noise(I_list,mu,sigma)
 
-lam = 1 # where lam = average occurences of event within given timeframe
+#lam = 1 # where lam = average occurences of event within given timeframe
 #poisson_I_list = add_poisson_noise(I_list,lam) 
 
-noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
+#noise_intensity = 6000 # = num of iterations of a random pixel getting replaced
 #saltpepper_I_list = add_saltpepper_noise(I_list, noise_intensity) # for some reason this keeps applying to the og list
 
 
