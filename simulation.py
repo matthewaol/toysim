@@ -81,16 +81,17 @@ def create_Tu_vectors_3d(num_cells, cell_size=1):
                     Tu.append([x*cell_size,y*cell_size,z*cell_size])
     return np.array(Tu)
 
-def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
-    return sp.spatial.distance.pdist(atoms).max()
-
-def create_Tu_vectors_t(num_cells,a,c): 
+def create_Tu_vectors_3d_tetra(num_cells,a,c): 
     Tu = []
 
     for x in range(num_cells):
         for y in range(num_cells):
             for z in range(num_cells):
-                Tu.append([x*a, y*a, y*c])
+                Tu.append([x*a, y*a, z*c])
+    return np.array(Tu)
+
+def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
+    return sp.spatial.distance.pdist(atoms).max()
 
 # Molecular Transform functions
 def molecular_transform(Q, Atoms,f_j,theta): # takes in a single Q vector and a list of atoms, outputs a single A value
@@ -133,9 +134,9 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
 def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Qs will be 3d and theta will be a matrix
     a = b = 0 
     
-    Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
-    exp_arg = Qs_mag**2 / 16 / np.pi**2 * -10.7
-    f_j = 7 * np.exp(exp_arg)
+    # Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
+    # exp_arg = Qs_mag**2 / 16 / np.pi**2 * -10.7
+    # f_j = 7 * np.exp(exp_arg)
 
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
@@ -298,32 +299,28 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
     return square_I_list
 
 if __name__ == '__main__':
-    # 3D sim
+    #3D sim
     print("Starting 3D simulation")
     alpha = 0 * np.pi / 180 
 
-    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
-    rotat_mat = rand_rot_mat.as_matrix()[0]
-
+    #rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    #rotat_mat = rand_rot_mat.as_matrix()[0]
+    rotat_mat = 1
     sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    Qs = create_q_vectors_3d(10,.2)
+    Qs = create_q_vectors_3d(5,.2)
     Tu = create_Tu_vectors_3d(5, determine_cell_size(sample_atoms))
-
-
     I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
 
     I_size = int(np.sqrt(len(I_list)))
     square_I_list = np.reshape(I_list, (I_size, I_size))
 
-    z_axis = 20
-
-    plt.imshow(square_I_list, vmax=1e6)
+    plt.imshow(square_I_list, vmax=1e7)
     plt.show()
 
-    # 2D sim
+    # # 2D sim
     # print("Starting 2D simulation")
-    # image_size = 20 # Parameter - Image Size (for now = 40) 
+    # image_size = 30 # Parameter - Image Size (for now = 40) 
     # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
     # Qs = create_q_vectors(image_size, image_resolution)
@@ -341,7 +338,7 @@ if __name__ == '__main__':
     # degrees = 0
     # theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-    # a = 0 # Parameter - value for the background, decent results are between .001 to .009
+    # a = .004 # Parameter - value for the background, decent results are between .001 to .009
 
     # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
@@ -351,8 +348,8 @@ if __name__ == '__main__':
 
     # spot_count = count_spots(I_list, square_I_list)
 
-    # show_image(square_I_list)
-
+    # plt.imshow(square_I_list,vmax=1e6)
+    # plt.show()
     # Background movie! going from a = 0 to 0.06 in steps of .001
     # for i in np.arange(0,.06,.001):
     #     a = i 
@@ -360,12 +357,13 @@ if __name__ == '__main__':
     #     square_I_list = plt.reshape(I_background_list, (Qs_size,Qs_size))
     #     show_image(square_I_list)
 
-    # # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
+    # Rotation movie!  going from 0 to 90 degrees in steps of 10 degrees
+    # print("starting rotation movie")
     # for i in np.arange(10): 
     #     degrees = 10 * i * np.pi / 180
-    #     img = get_I_values(Qs,Atoms,Tu,1,degrees)
+    #     img = get_I_values(Qs,molecule,Tu,1,degrees)
     #     square_I_list = plt.reshape(img, (Qs_size,Qs_size)) 
-    #     plt.imshow(square_I_list, vmax = I_list.mean() + I_list.std(), vmin = I_list.mean() - I_list.std())
+    #     plt.imshow(square_I_list, vmax = 1e6)
     #     plt.draw
     #     plt.pause(.5)
 
