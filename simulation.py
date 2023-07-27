@@ -4,12 +4,14 @@
 import pylab as plt 
 import numpy as np
 import scipy as sp
-
 import numexpr as ne
 
 from Bio.PDB.PDBParser import PDBParser
 
-# from IPython import embed;embed() <- can use this to make breakpoints 
+import models
+import detectors
+from dxtbx.model.beam import BeamFactory
+from dxtbx.model.detector import DetectorFactory 
 
 def get_coords_pdb(file_name, structure_id,get_only_xy=True):
     '''
@@ -65,7 +67,7 @@ def create_q_vectors(image_size, step_size=1):
             q_vectors.append([x, y])
     return np.array(q_vectors) 
 
-#@profile
+
 def create_q_vectors_3d(image_size, step_size): 
     q_vectors = [] 
     
@@ -91,7 +93,6 @@ def create_Tu_vectors(num_cells, cell_size=1):
             Tu.append([x * cell_size, y * cell_size])
     return np.array(Tu)
 
-#@profile
 def create_Tu_vectors_3d(num_cells, cell_size=1): 
     '''
     Creates lattice vectors with unit cells forming a cube
@@ -132,7 +133,7 @@ def determine_cell_size(atoms):
             atoms: Array of atom coordinates 
         Returns: float value of the maximum distance found in array of atom coordinates
     '''
-    return sp.spatial.distance.pdist(atoms).max()
+    return sp.spatial.distance.pdist(atoms).max() * 5
 
 # Molecular Transform functions
 def molecular_transform(Q, Atoms,f_j,theta): # takes in a single Q vector and a list of atoms, outputs a single A value
@@ -171,16 +172,22 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
 
-#@profile
-def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): 
+def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m): 
     '''
     Computes molecular transform on array of Q-vectors and atoms
+        Parameters: 
+            Qs: Array of 3D Q-vectors
+            Atoms: Array of 3D atoms coordinates 
+            rotation_m: 3D rotation matrix
+        Returns:
+            Array of molecular transform values in complex num form
     '''
     a = b = 0 
     
-    # Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
-    # exp_arg = Qs_mag**2 / 16 / np.pi**2 * -10.7
-    # f_j = 7 * np.exp(exp_arg)
+    Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
+    exp_arg = Qs_mag**2 / 4 * -10.7
+    f_j = 7 * np.exp(exp_arg)
+    f_j = 1
 
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
@@ -230,12 +237,15 @@ def lattice_transform_no_loop_array(Qs, Tu, theta): # takes in an array of Q ins
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
-#@profile
 def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes in rotation matrix    
     rotated_u = np.dot(rotation_m,Tu.T) 
     phase = np.dot(Qs, rotated_u)  
-    a = np.sum(np.cos(phase), axis = 1) # indicating axis = 1, to sum over the columns instead of rows
-    b = np.sum(np.sin(phase), axis = 1)
+        
+    cos_phase = ne.evaluate("cos(phase)")
+    sin_phase = ne.evaluate("sin(phase)")
+
+    a = np.sum(cos_phase, axis = 1) # indicating axis = 1, to sum over the columns instead of rows
+    b = np.sum(sin_phase, axis = 1)
 
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
@@ -268,12 +278,11 @@ def get_I_values_no_loop(Qs, Atoms, Tu, f_j, theta):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
-#@profile
-def get_I_values_no_loop_3d(Qs, Atoms, Tu, f_j, rotation_m): 
+def get_I_values_no_loop_3d(Qs, Atoms, Tu, rotation_m): 
     
     print("Computing intensities")
     
-    a_molecular = molecular_transform_no_loop_array_3d(Qs, Atoms, f_j, rotation_m)
+    a_molecular = molecular_transform_no_loop_array_3d(Qs, Atoms, rotation_m)
     a_lattice = lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m)
     a_total = a_molecular * a_lattice
     
@@ -348,7 +357,6 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
         Returns:
             List of intensity values reshaped into a square
     '''
-    
     f_j = 1
     Tu = create_Tu_vectors(num_cells,cell_size)
     
@@ -367,6 +375,13 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
 if __name__ == '__main__':
     #3D sim
     print("Starting 3D simulation")
+
+    print("Bringing in Qs from detector")
+    beam = BeamFactory.from_dict(models.beam) 
+    detector = DetectorFactory.from_dict(models.pilatus)
+    qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
+    qvecs = qvecs[0]
+
     alpha = 0 * np.pi / 180 
 
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
@@ -374,9 +389,10 @@ if __name__ == '__main__':
 
     sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    Qs = create_q_vectors_3d(5,.2)
-    Tu = create_Tu_vectors_3d(5, determine_cell_size(sample_atoms))
-    I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, 1, rotat_mat)
+    Qs = create_q_vectors_3d(20,.2)
+    Tu = create_Tu_vectors_3d(4, determine_cell_size(sample_atoms))
+
+    I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, rotat_mat)
 
     I_size = int(np.sqrt(len(I_list)))
     square_I_list = np.reshape(I_list, (I_size, I_size))
