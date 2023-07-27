@@ -5,6 +5,8 @@ import pylab as plt
 import numpy as np
 import scipy as sp
 
+import numexpr as ne
+
 from Bio.PDB.PDBParser import PDBParser
 
 # from IPython import embed;embed() <- can use this to make breakpoints 
@@ -183,8 +185,8 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m):
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
     
-    cos_phase = np.cos(phase)
-    sin_phase = np.sin(phase)
+    cos_phase = ne.evaluate("cos(phase)")
+    sin_phase = ne.evaluate("sin(phase)")
 
     a = np.sum(cos_phase, axis = 1)
     b = np.sum(sin_phase, axis = 1) 
