@@ -47,14 +47,23 @@ def show_image(square_I_list):
     plt.show()
 
 # Q-vector functions
-def create_q_vectors(image_size, step_size):
+def create_q_vectors(image_size, step_size=1):
+    '''
+    Creates 2d array of Q-vectors ranging from [-image_size,-image_size] to [image_size,image_size]
+    Parameters: 
+        image_size: int specifiying the size of q-vectors
+        step_size: float specifying the step size between q-vectors (default is 1)
+    Returns:
+        2D numpy array of Q-vectors
+    '''
     q_vectors = [] 
     
     for x in np.arange(-image_size, image_size+.01, step_size): 
         for y in np.arange(-image_size, image_size+.01, step_size):  
             q_vectors.append([x, y])
-    return plt.array(q_vectors) 
+    return np.array(q_vectors) 
 
+#@profile
 def create_q_vectors_3d(image_size, step_size): 
     q_vectors = [] 
     
@@ -63,8 +72,16 @@ def create_q_vectors_3d(image_size, step_size):
                 q_vectors.append([x, y, np.sqrt(x**2 + y**2)])
     return np.array(q_vectors)
  
-# Lattice function
+# Lattice functions
 def create_Tu_vectors(num_cells, cell_size=1): 
+    '''
+    Creates lattice vectors with unit cells forming a square
+        Parameters: 
+            num_cells: int specifying the number of unit cells in lattice
+            cell_size: float specifying the size of each cell (cell_size by cell_size) (default=1)
+        Returns:
+            2D numpy array of lattice vectors
+    '''
     Tu = []
     
     for x in range(num_cells):
@@ -72,7 +89,16 @@ def create_Tu_vectors(num_cells, cell_size=1):
             Tu.append([x * cell_size, y * cell_size])
     return np.array(Tu)
 
+#@profile
 def create_Tu_vectors_3d(num_cells, cell_size=1): 
+    '''
+    Creates lattice vectors with unit cells forming a cube
+        Parameters: 
+            num_cells: int specifying the number of unit cells in lattice
+            cell_size: float specifying the size of each cell (cell_size by cell_size by cell_size) (default=1)
+        Returns:
+            2D numpy array of lattice vectors
+    '''
     Tu = []
     
     for x in range(num_cells): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
@@ -90,7 +116,20 @@ def create_Tu_vectors_3d_tetra(num_cells,a,c):
                 Tu.append([x*a, y*a, z*c])
     return np.array(Tu)
 
-def determine_cell_size(atoms): # determines cell size based on the max value of distances between all atoms
+def create_Tu_vectors_3d_ortho(num_cells,a,b,c):
+    for x in range(num_cells):
+        for y in range(num_cells):
+            for z in range(num_cells):
+                Tu.append([x*a, y*b, z*c])
+    return np.array(Tu)
+
+def determine_cell_size(atoms): 
+    '''
+    Determines an appropriate cell size for lattice based on the maximum distance value from array of atoms
+        Parameters: 
+            atoms: Array of atom coordinates 
+        Returns: float value of the maximum distance found in array of atom coordinates
+    '''
     return sp.spatial.distance.pdist(atoms).max()
 
 # Molecular Transform functions
@@ -98,8 +137,7 @@ def molecular_transform(Q, Atoms,f_j,theta): # takes in a single Q vector and a 
     a = b = 0
     
     for atom in Atoms:
-        phase = plt.dot(Q,rotation_matrix(atom,theta)) # to rotate or not to rotate
-        #phase = plt.dot(Q,atom)
+        phase = plt.dot(Q,rotation_matrix(atom,theta)) 
         a+= plt.cos(phase) # summing real terms 
         b+= plt.sin(phase) # summing imaginary terms
     # computing amplitude
@@ -131,7 +169,11 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
 
-def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Qs will be 3d and theta will be a matrix
+#@profile
+def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): 
+    '''
+    Computes molecular transform on array of Q-vectors and atoms
+    '''
     a = b = 0 
     
     # Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
@@ -141,10 +183,14 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms, f_j,rotation_m): # Atoms & Q
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
     
-    a = np.sum(np.cos(phase), axis = 1)
-    b = np.sum(np.sin(phase), axis = 1) 
+    cos_phase = np.cos(phase)
+    sin_phase = np.sin(phase)
+
+    a = np.sum(cos_phase, axis = 1)
+    b = np.sum(sin_phase, axis = 1) 
     
     i_real, i_imag = a*f_j, b*f_j
+
     return i_real + i_imag*1j
 
 # Lattice transform functions
@@ -182,6 +228,7 @@ def lattice_transform_no_loop_array(Qs, Tu, theta): # takes in an array of Q ins
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
+#@profile
 def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes in rotation matrix    
     rotated_u = np.dot(rotation_m,Tu.T) 
     phase = np.dot(Qs, rotated_u)  
@@ -219,6 +266,7 @@ def get_I_values_no_loop(Qs, Atoms, Tu, f_j, theta):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
+#@profile
 def get_I_values_no_loop_3d(Qs, Atoms, Tu, f_j, rotation_m): 
     
     print("Computing intensities")
@@ -240,6 +288,10 @@ def add_background_exp(I_list, Qs, a): #add background based on exponential deca
         background_list.append(B)
         
     return np.array(background_list) * I_list
+
+def add_background_exp_no_loop(I_list, Qs, a):
+    B_list = np.exp(-(Qs[:,0]**2 + Qs[:,1]**2 )* a) * I_list
+    return B_list 
 
 def add_background_offset(I_list,a): # adds constant offset to I_list
     return I_list + a
@@ -282,6 +334,18 @@ def count_spots(I_list,square_I_list): # returns num of peaks and slices indicat
     return num_of_labels, peaks
 
 def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees): 
+    '''
+    Produces a simulated diffraction image from 2D Q-vectors and a pdb file
+        Parameters: 
+            pdb_file_name: string path to pdb file
+            Qs: 2D array of Q-vectors
+            num_cells: int specifying the number of cells for lattice
+            cell_size: float specifiying the cell size for lattice
+            a: float value constant for controlling the background 
+            degrees: float value for rotating the image
+        Returns:
+            List of intensity values reshaped into a square
+    '''
     
     f_j = 1
     Tu = create_Tu_vectors(num_cells,cell_size)
@@ -290,7 +354,7 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
     molecule = get_coords_pdb(pdb_file_name, "temporary_id")
     
     I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta)
-    I_list_background = add_background_exp(I_list,Qs,a)
+    I_list_background = add_background_exp_no_loop(I_list,Qs,a)
     
     I_list_size = int(np.sqrt(len(I_list)))
     
@@ -303,9 +367,9 @@ if __name__ == '__main__':
     print("Starting 3D simulation")
     alpha = 0 * np.pi / 180 
 
-    #rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
-    #rotat_mat = rand_rot_mat.as_matrix()[0]
-    rotat_mat = 1
+    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    rotat_mat = rand_rot_mat.as_matrix()[0]
+
     sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
     Qs = create_q_vectors_3d(5,.2)
@@ -318,7 +382,7 @@ if __name__ == '__main__':
     plt.imshow(square_I_list, vmax=1e7)
     plt.show()
 
-    # # 2D sim
+    # 2D sim
     # print("Starting 2D simulation")
     # image_size = 30 # Parameter - Image Size (for now = 40) 
     # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
@@ -342,7 +406,8 @@ if __name__ == '__main__':
 
     # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
-    # I_list = add_background_exp(I_list,Qs,a)
+    # I_list_back_noL = add_background_exp_no_loop(I_list, Qs, a )
+    # I_list_back = add_background_exp(I_list, Qs, a)
 
     # square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
 
