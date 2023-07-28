@@ -142,9 +142,8 @@ def molecular_transform(Q, Atoms,f_j,theta): # takes in a single Q vector and a 
     
     for atom in Atoms:
         phase = plt.dot(Q,rotation_matrix(atom,theta)) 
-        a+= plt.cos(phase) # summing real terms 
-        b+= plt.sin(phase) # summing imaginary terms
-    # computing amplitude
+        a+= plt.cos(phase)  
+        b+= plt.sin(phase) 
     
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
@@ -165,6 +164,7 @@ def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array o
     a = b = 0
     rotation_m = np.array([[np.cos(theta), -np.sin(theta)],
                   [np.sin(theta), np.cos(theta)]])
+    
     
     rotated_u = np.dot(rotation_m,Atoms.T)
     phase = np.dot(Qs, rotated_u)
@@ -327,7 +327,7 @@ if __name__ == '__main__':
     detector = DetectorFactory.from_dict(models.pilatus)
     qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
     qvecs = qvecs[0]
-
+    
     alpha = 0 * np.pi / 180 
 
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)

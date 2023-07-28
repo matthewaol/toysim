@@ -1,5 +1,9 @@
 import numpy as np
 
+# Background functions
+
+def add_background_water(I_list, Qs):
+    ...
 def add_background_exp(I_list, Qs, a): #add background based on exponential decay
     background_list = []
     
