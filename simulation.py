@@ -197,16 +197,44 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
 
     a = np.sum(cos_phase, axis = 1)
     b = np.sum(sin_phase, axis = 1) 
-    
+
     i_real, i_imag = a*f_j, b*f_j
 
     return i_real + i_imag*1j
 
-def molecular_transform_chunks(Qs, chunks_of_atoms, rotation_m): 
-    ...
+# @profile
+def molecular_transform_chunks(Qs, Atoms, rotation_m, chunk_size): 
+    a2 = np.zeros(len(Qs))
+    b2 = np.zeros(len(Qs))
+    
+    Qs_mag = np.linalg.norm(Qs,axis=1)
+    exp_arg = Qs_mag**2 / 4 * -10.7
+    f_j = 7 * np.exp(exp_arg)
+    f_j = 1
+
+    num_chunks = len(Atoms) // chunk_size
+
+    print("Chunking up atoms")
+    chunked_atoms = (np.array_split(Atoms,num_chunks))
+    print("Computing molecular transform for each chunk")
+    
+    for chunk in chunked_atoms:
+        rotated_u = np.dot(rotation_m, chunk.T) 
+        chunk_phase = np.dot(Qs, rotated_u)
+        a2 += np.sum(np.cos(chunk_phase), axis=1) 
+        b2 += np.sum(np.sin(chunk_phase), axis=1)
+
+    i_real, i_imag = a2*f_j, b2*f_j
+    return i_real + i_imag*1j
 
 def test_molecular_transform():
-    ...
+    test_qs = create_q_vectors_3d(20,.1)
+    test_atoms = np.array([[3,4,1],[3,1,6],[2,1,5],[3,2,1]])
+    molecular = molecular_transform_no_loop_array_3d(test_qs,test_atoms, 1)
+    molecular_chunks = molecular_transform_chunks(test_qs,test_atoms,1, 10)
+    assert np.allclose(molecular,molecular_chunks)
+    print("Molecular transform passed!")
+
 # Lattice transform functions
 def lattice_transform(Q, Tu,theta): # takes in a single Q vector and a list of Tu vectors, outputs a single A value
     a = b = 0 
@@ -294,6 +322,17 @@ def get_I_values_no_loop_3d(Qs, Atoms, Tu, rotation_m):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
+def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,chunk_size): 
+    
+    print("Computing intensities")
+    
+    a_molecular = molecular_transform_chunks(Qs, Atoms, rotation_m,chunk_size)
+    a_lattice = lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m)
+    a_total = a_molecular * a_lattice
+    
+    print("Finished intensities")
+    return a_total.real**2 + a_total.imag**2
+
 def count_spots(square_I_list, threshold_factor=None):
     if threshold_factor is not None: 
         threshold = square_I_list > threshold_factor 
@@ -334,6 +373,17 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
     return square_I_list
 
 if __name__ == '__main__':
+
+
+    #testing molec
+    # rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    # rotat_mat = rand_rot_mat.as_matrix()[0]
+
+    # sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
+    # Qs = create_q_vectors_3d(20,.2)
+    # mol = molecular_transform_chunks(Qs, sample_atoms,1)
+    # mol2 = molecular_transform_no_loop_array_3d(Qs, sample_atoms, 1)
+    # test_molecular_transform()
     #3D sim
     print("Starting 3D simulation")
 
@@ -343,8 +393,6 @@ if __name__ == '__main__':
     qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
     qvecs = qvecs[0]
 
-    alpha = 0 * np.pi / 180 
-
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
     rotat_mat = rand_rot_mat.as_matrix()[0]
 
@@ -353,10 +401,10 @@ if __name__ == '__main__':
     Qs = create_q_vectors_3d(20,.2)
     Tu = create_Tu_vectors_3d(4, determine_cell_size(sample_atoms))
 
-    I_list = get_I_values_no_loop_3d(Qs, sample_atoms, Tu, rotat_mat)
+    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat,100)
 
     I_size = int(np.sqrt(len(I_list)))
-    square_I_list = np.reshape(I_list, (I_size, I_size))
+    square_I_list = np.reshape(I_list, (img_sh))
 
     plt.imshow(square_I_list, vmax=1e7)
     plt.show()
