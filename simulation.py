@@ -185,10 +185,9 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
     '''
     a = b = 0 
     
-    Qs_mag = np.sqrt(Qs[:,0]**2 + Qs[:,1]**2 + Qs[:,2]**2)
+    Qs_mag = np.linalg.norm(Qs,axis=1)
     exp_arg = Qs_mag**2 / 4 * -10.7
     f_j = 7 * np.exp(exp_arg)
-    f_j = 1
 
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
@@ -203,6 +202,11 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
 
     return i_real + i_imag*1j
 
+def molecular_transform_chunks(Qs, chunks_of_atoms, rotation_m): 
+    ...
+
+def test_molecular_transform():
+    ...
 # Lattice transform functions
 def lattice_transform(Q, Tu,theta): # takes in a single Q vector and a list of Tu vectors, outputs a single A value
     a = b = 0 
@@ -290,6 +294,17 @@ def get_I_values_no_loop_3d(Qs, Atoms, Tu, rotation_m):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
+def count_spots(square_I_list, threshold_factor=None):
+    if threshold_factor is not None: 
+        threshold = square_I_list > threshold_factor 
+    else:
+        threshold = square_I_list 
+        
+    labels, num_of_labels = sp.ndimage.label(threshold) # Label each index of intensity array based on our defined threshold
+    peaks = sp.ndimage.find_objects(labels) # gets tuples corresponding to the location of each peak
+    print("Number of spots: " + str(num_of_labels)) 
+    return num_of_labels, peaks 
+
 def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees): 
     '''
     Produces a simulated diffraction image from 2D Q-vectors and a pdb file
@@ -327,7 +342,7 @@ if __name__ == '__main__':
     detector = DetectorFactory.from_dict(models.pilatus)
     qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
     qvecs = qvecs[0]
-    
+
     alpha = 0 * np.pi / 180 
 
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
@@ -348,7 +363,7 @@ if __name__ == '__main__':
 
     # 2D sim
     # print("Starting 2D simulation")
-    # image_size = 30 # Parameter - Image Size (for now = 40) 
+    # image_size = 20 # Parameter - Image Size (for now = 40) 
     # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
     # Qs = create_q_vectors(image_size, image_resolution)
@@ -366,16 +381,15 @@ if __name__ == '__main__':
     # degrees = 0
     # theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-    # a = .004 # Parameter - value for the background, decent results are between .001 to .009
+    # a = .003 # Parameter - value for the background, decent results are between .001 to .009
 
     # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
-    # I_list_back_noL = add_background_exp_no_loop(I_list, Qs, a )
-    # I_list_back = add_background_exp(I_list, Qs, a)
+    # I_list_background = bgnoise.add_background_water(I_list,np.linalg.norm(Qs,axis=1),5,8)    
 
-    # square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
+    # square_I_list = plt.reshape(I_list_background, (Qs_size,Qs_size)) # reshaping list into a square 
 
-    # spot_count = count_spots(I_list, square_I_list)
+    # #spot_count = count_spots(I_list, square_I_list)
 
     # plt.imshow(square_I_list,vmax=1e6)
     # plt.show()

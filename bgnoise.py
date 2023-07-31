@@ -2,8 +2,17 @@ import numpy as np
 
 # Background functions
 
-def add_background_water(I_list, Qs):
-    ...
+def add_background_water(I_list, Qs_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
+    indices = np.where((Qs_magnitude >= lower_bound) & (Qs_magnitude <= upper_bound)) 
+
+    for i in indices:
+        I_list[i]+= intensity
+    return I_list
+    # If qs_mag == this range of values, 
+    # save the indices 
+    # then add a constant to the same indices in I_list
+
+
 def add_background_exp(I_list, Qs, a): #add background based on exponential decay
     background_list = []
     
@@ -30,6 +39,7 @@ def add_background_cauchy(I_list): #doesnt work yet
     return cauchy_list + I_list
 
 # Noise functions
+
 def add_gaussian_noise(I_list, mu, sigma): # returns the list of I's with gaussian noise multiplied into it 
     gaussian_array = np.random.default_rng().normal(mu, sigma, len(I_list)) 
     noisy_I_list = I_list * gaussian_array
