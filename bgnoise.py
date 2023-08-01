@@ -3,13 +3,34 @@ import scipy as sp
 # Background functions
 
 def add_background_waterfile(bg_file, I_list, Q_magnitude,intensity=100):
+    '''
+    Uses interpolation to layer water background as a function on top of intensity values
+        Parameters:
+            bg_file: string path to background .txt file
+            I_list: 1D array of image intensities
+            Q_magnitude: 1D array of magnitudes from Q-vectors
+            intensity: intensity of the background (default=100)
+        Returns: 
+            List of intensity values with background added to it 
+    '''
     qmags, I_vals = np.loadtxt(bg_file).T
     interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value="extrapolate")
     new_intensities = interpolated_func(Q_magnitude)
     return new_intensities*intensity + I_list
 
-def add_background_water_offset(I_list, Qs_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
-    indices = np.where((Qs_magnitude >= lower_bound) & (Qs_magnitude <= upper_bound)) 
+def add_background_water_offset(I_list, Q_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
+    '''
+    Adds donut shaped offset to image, centered at the origin
+        Parameters: 
+            I_list: 1D array of image intensities
+            Q_magnitude: 1D array of magnitudes from Q-vectors
+            lower_bound: inner radius of donut (default=5)
+            upper_bound: outer radius of donut (default=10) 
+            intensity: intensity of the offset (default=1e5)
+        Returns: 
+            List of intensities with donut offset added into it 
+    '''
+    indices = np.where((Q_magnitude >= lower_bound) & (Q_magnitude <= upper_bound)) 
 
     for i in indices:
         I_list[i]+= intensity
