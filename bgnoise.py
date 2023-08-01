@@ -1,17 +1,19 @@
 import numpy as np
-
+import scipy as sp
 # Background functions
 
-def add_background_water(I_list, Qs_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
+def add_background_waterfile(bg_file, I_list, Q_magnitude,intensity=100):
+    qmags, I_vals = np.loadtxt(bg_file).T
+    interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value="extrapolate")
+    new_intensities = interpolated_func(Q_magnitude)
+    return new_intensities*intensity + I_list
+
+def add_background_water_offset(I_list, Qs_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
     indices = np.where((Qs_magnitude >= lower_bound) & (Qs_magnitude <= upper_bound)) 
 
     for i in indices:
         I_list[i]+= intensity
     return I_list
-    # If qs_mag == this range of values, 
-    # save the indices 
-    # then add a constant to the same indices in I_list
-
 
 def add_background_exp(I_list, Qs, a): #add background based on exponential decay
     background_list = []
@@ -24,7 +26,7 @@ def add_background_exp(I_list, Qs, a): #add background based on exponential deca
     return np.array(background_list) * I_list
 
 def add_background_exp_no_loop(I_list, Qs, a):
-    B_list = np.exp(-(Qs[:,0]**2 + Qs[:,1]**2 )* a) * I_list
+    B_list = np.exp(-(np.linalg.norm(Qs,axis=1))* a) * I_list
     return B_list 
 
 def add_background_offset(I_list,a): # adds constant offset to I_list
