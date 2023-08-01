@@ -190,6 +190,7 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
     exp_arg = Qs_mag**2 / 4 * -10.7
     f_j = 7 * np.exp(exp_arg)
     f_j = 1
+
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
     
@@ -213,7 +214,7 @@ def molecular_transform_chunks(Qs, Atoms, rotation_m, chunk_size):
     f_j = 7 * np.exp(exp_arg)
     f_j = 1
 
-    num_chunks = len(Atoms) // chunk_size
+    num_chunks = len(Atoms) / chunk_size
 
     print("Chunking up atoms")
     chunked_atoms = (np.array_split(Atoms,num_chunks))
@@ -234,6 +235,9 @@ def molecular_transform_chunks(Qs, Atoms, rotation_m, chunk_size):
     return i_real + i_imag*1j
 
 def test_molecular_transform():
+    '''
+    Testing the molecular transform withh the chunking version 
+    '''
     test_qs = np.random.random((5000,3))#create_q_vectors_3d(20,.1)
     test_atoms = np.random.random((1000,3))#np.array([[3,4,1],[3,1,6],[2,1,5],[3,2,1]])
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
@@ -266,13 +270,21 @@ def lattice_transform_no_loop(Q, Tu, theta): # takes in single Q vector and list
     i_real, i_imag = a, b
     return i_real + i_imag * 1j 
 
-def lattice_transform_no_loop_array(Qs, Tu, theta): # takes in an array of Q instead of a single Q
+def lattice_transform_no_loop_array(Qs, Tu, theta): 
+    '''
+    Performs lattice transform with Q-vectors and Lattice vectors
+        Parameters: 
+            Qs: 2D array of 2D q-vectors
+            Tu: 2D array of Tu (lattice) vectors
+            theta: angle in radians to rotate transform
+        Returns: 1D array of lattice transform values in complex number form
+    '''
     rotation_m = np.array([[np.cos(theta), -np.sin(theta)],
                   [np.sin(theta), np.cos(theta)]])
     
     rotated_u = np.dot(rotation_m,Tu.T) 
     phase = np.dot(Qs, rotated_u)  
-    a = np.sum(np.cos(phase), axis = 1) # indicating axis = 1, to sum over the columns instead of rows
+    a = np.sum(np.cos(phase), axis = 1) 
     b = np.sum(np.sin(phase), axis = 1)
 
     i_real, i_imag = a, b
@@ -382,69 +394,70 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
 
 if __name__ == '__main__':
     #3D sim
-    start = time.time()
+    # start = time.time()
 
-    print("Starting 3D simulation")
+    # print("Starting 3D simulation")
 
-    print("Bringing in Qs from detector")
-    beam = BeamFactory.from_dict(models.beam) 
-    detector = DetectorFactory.from_dict(models.pilatus)
-    qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
-    qvecs = qvecs[0]
+    # print("Bringing in Qs from detector")
+    # beam = BeamFactory.from_dict(models.beam) 
+    # detector = DetectorFactory.from_dict(models.pilatus)
+    # qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
+    # qvecs = qvecs[0]
 
-    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=10)
-    rotat_mat = rand_rot_mat.as_matrix()[0]
+    # rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    # rotat_mat = rand_rot_mat.as_matrix()[0]
 
-    sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
+    # sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    Qs = create_q_vectors_3d(20,.2)
-    Tu = create_Tu_vectors_3d(4, determine_cell_size(sample_atoms))
+    # Qs = create_q_vectors_3d(20,.2)
+    # Tu = create_Tu_vectors_3d(4, determine_cell_size(sample_atoms))
 
-    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70)
+    # I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70)
     
-    I_size = int(np.sqrt(len(I_list)))
-    square_I_list = np.reshape(I_list, (img_sh))
+    # I_list = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt",I_list,np.linalg.norm(qvecs,axis=1),9e4)
+    # I_size = int(np.sqrt(len(I_list)))
+    # square_I_list = np.reshape(I_list, (img_sh))
 
 
-    end = time.time()
-    print("Program took", str(end-start), "secs")
+    # end = time.time()
+    # print("Program took", str(end-start), "secs")
 
-    plt.imshow(square_I_list, vmax=1e6)
-    plt.show()
-
-    # 2D sim
-    # print("Starting 2D simulation")
-    # image_size = 20 # Parameter - Image Size (for now = 40) 
-    # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
-
-    # Qs = create_q_vectors(image_size, image_resolution)
-
-    # Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
-    
-    # triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
-    # molecule = get_coords_pdb("4bs7.pdb", "4bs7")
-
-    # f_j = 1
-
-    # num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
-    # Tu = create_Tu_vectors(num_cells,cell_size)
-
-    # degrees = 0
-    # theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
-
-    # a = .003 # Parameter - value for the background, decent results are between .001 to .009
-
-    # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
-
-    # # I_list_background = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt", I_list,np.linalg.norm(Qs,axis=1))
-    # I_list_background = bgnoise.add_background_water_offset(I_list,np.linalg.norm(Qs,axis=1))
-                                                            
-    # square_I_list = plt.reshape(I_list_background, (Qs_size,Qs_size)) # reshaping list into a square 
-    
-    # #spot_count = count_spots(I_list, square_I_list)
-
-    # plt.imshow(square_I_list,vmax=1e6)
+    # plt.imshow(square_I_list, vmax=1e6)
     # plt.show()
+
+    #2D sim
+    print("Starting 2D simulation")
+    image_size = 20 # Parameter - Image Size (for now = 40) 
+    image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
+
+    Qs = create_q_vectors(image_size, image_resolution)
+
+    Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
+    
+    triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+    molecule = get_coords_pdb("4bs7.pdb", "4bs7")
+
+    f_j = 1
+
+    num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
+    Tu = create_Tu_vectors(num_cells,cell_size)
+
+    degrees = 0
+    theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
+
+    a = .003 # Parameter - value for the background, decent results are between .001 to .009
+
+    I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
+
+    I_list = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt", I_list,np.linalg.norm(Qs,axis=1),100)
+    #I_list = bgnoise.add_background_water_offset(I_list,np.linalg.norm(Qs,axis=1))
+                                                            
+    square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
+    
+    #spot_count = count_spots(I_list, square_I_list)
+
+    plt.imshow(square_I_list,vmax=1e6)
+    plt.show()
 
     # Background movie! going from a = 0 to 0.06 in steps of .001
     # for i in np.arange(0,.06,.001):

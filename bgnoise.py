@@ -17,7 +17,7 @@ def add_background_waterfile(bg_file, I_list, Q_magnitude,intensity=100):
     interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value="extrapolate")
     new_intensities = interpolated_func(Q_magnitude)
     return new_intensities*intensity + I_list
-
+    
 def add_background_water_offset(I_list, Q_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
     '''
     Adds donut shaped offset to image, centered at the origin
@@ -48,7 +48,7 @@ def add_background_exp(I_list, Qs, a): #add background based on exponential deca
 
 def add_background_exp_no_loop(I_list, Qs, a):
     B_list = np.exp(-(np.linalg.norm(Qs,axis=1))* a) * I_list
-    return B_list 
+    return np.array(B_list) 
 
 def add_background_offset(I_list,a): # adds constant offset to I_list
     return I_list + a
