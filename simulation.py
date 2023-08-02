@@ -189,7 +189,6 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
     Qs_mag = np.linalg.norm(Qs,axis=1)
     exp_arg = Qs_mag**2 / 4 * -10.7
     f_j = 7 * np.exp(exp_arg)
-    f_j = 1
 
     rotated_u = np.dot(rotation_m, Atoms.T)
     phase = np.dot(Qs, rotated_u)
@@ -212,7 +211,6 @@ def molecular_transform_chunks(Qs, Atoms, rotation_m, chunk_size):
     Qs_mag = np.linalg.norm(Qs,axis=1)
     exp_arg = Qs_mag**2 / 4 * -10.7
     f_j = 7 * np.exp(exp_arg)
-    f_j = 1
 
     num_chunks = len(Atoms) / chunk_size
 
@@ -291,6 +289,8 @@ def lattice_transform_no_loop_array(Qs, Tu, theta):
     return i_real + i_imag * 1j
 
 def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes in rotation matrix    
+    a = b = 0 
+    
     rotated_u = np.dot(rotation_m,Tu.T) 
     phase = np.dot(Qs, rotated_u)  
         
@@ -303,6 +303,53 @@ def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes 
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
+def chunk_transform(Qs,vectors,rotation_m,chunk_size,f_j_is1=True):
+    a2 = np.zeros(len(Qs))
+    b2 = np.zeros(len(Qs))
+    
+    if f_j_is1 is not True:
+        Qs_mag = np.linalg.norm(Qs,axis=1)
+        exp_arg = Qs_mag**2 / 4 * -10.7
+        f_j = 7 * np.exp(exp_arg)
+    else:
+        f_j=1
+
+    num_chunks = len(vectors) / chunk_size
+
+    print("Chunking up")
+    chunked_vectors = (np.array_split(vectors,num_chunks))
+    
+    i=0
+    for chunk in chunked_vectors:
+        i+=1
+        print("Computing chunk #",i)
+
+        rotated_u = np.dot(rotation_m, chunk.T) 
+        chunk_phase = np.dot(Qs, rotated_u)
+
+        a2 += np.sum(ne.evaluate("cos(chunk_phase)"), axis=1) 
+        b2 += np.sum(ne.evaluate("sin(chunk_phase)"), axis=1)
+
+    i_real, i_imag = a2*f_j, b2*f_j
+    return i_real + i_imag*1j
+
+def test_chunk_transform():
+    test_qs = np.random.random((5000,3))
+    test_atoms = np.random.random((1000,3))
+    test_Tu = np.random.random((500,3))
+    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    rotat_mat = rand_rot_mat.as_matrix()[0]
+
+    mol = molecular_transform_no_loop_array_3d(test_qs,test_atoms,rotat_mat)
+    mol_chunk = chunk_transform(test_qs, test_atoms,rotat_mat,70)
+    assert np.allclose(mol,mol_chunk)
+    print("Molecular transform pass!")
+    
+    lat = lattice_transform_no_loop_array_3d(test_qs,test_Tu,rotat_mat)
+    lat_chunk = chunk_transform(test_qs, test_Tu, rotat_mat,True)
+    assert np.allclose(lat,lat_chunk)
+    print("Lattice transform pass!")
+    
 # Complete transform functions
 def get_I_values(Qs, Atoms, Tu, f_j, theta): # calculating the lattice and molecular transforms and returning intensities
     
@@ -345,9 +392,12 @@ def get_I_values_no_loop_3d(Qs, Atoms, Tu, rotation_m):
 def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,chunk_size): 
     
     print("Computing intensities")
-    
-    a_molecular = molecular_transform_chunks(Qs, Atoms, rotation_m,chunk_size)
-    a_lattice = lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m)
+
+    print("Computing Molecular transform")
+    a_molecular = chunk_transform(Qs, Atoms, rotation_m,chunk_size)
+
+    print("Computing Lattice transform")
+    a_lattice = chunk_transform(Qs, Tu, rotation_m,chunk_size,True)
     a_total = a_molecular * a_lattice
     
     print("Finished intensities")
@@ -394,70 +444,71 @@ def produce_image(pdb_file_name, Qs, num_cells,cell_size, a, degrees):
 
 if __name__ == '__main__':
     #3D sim
-    # start = time.time()
+    start = time.time()
 
-    # print("Starting 3D simulation")
+    print("Starting 3D simulation")
 
-    # print("Bringing in Qs from detector")
-    # beam = BeamFactory.from_dict(models.beam) 
-    # detector = DetectorFactory.from_dict(models.pilatus)
-    # qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
-    # qvecs = qvecs[0]
+    print("Bringing in Qs from detector")
+    beam = BeamFactory.from_dict(models.beam) 
+    detector = DetectorFactory.from_dict(models.pilatus)
+    qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
+    qvecs = qvecs[0]
 
-    # rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
-    # rotat_mat = rand_rot_mat.as_matrix()[0]
+    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    rotat_mat = rand_rot_mat.as_matrix()[0]
 
-    # sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
+    sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    # Qs = create_q_vectors_3d(20,.2)
-    # Tu = create_Tu_vectors_3d(4, determine_cell_size(sample_atoms))
+    Qs = create_q_vectors_3d(20,.2)
+    Tu = create_Tu_vectors_3d(20, determine_cell_size(sample_atoms))
 
-    # I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70)
+    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70)
     
-    # I_list = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt",I_list,np.linalg.norm(qvecs,axis=1),9e4)
-    # I_size = int(np.sqrt(len(I_list)))
-    # square_I_list = np.reshape(I_list, (img_sh))
+    background = bgnoise.add_background_file("randomstols/water_014.stol",np.linalg.norm(qvecs,axis=1))
+    
+    I_size = int(np.sqrt(len(I_list)))
+    square_I_list = np.reshape(I_list, (img_sh))
 
 
-    # end = time.time()
-    # print("Program took", str(end-start), "secs")
+    end = time.time()
+    print("Program took", str(end-start), "secs or", ((end-start)/60 ), "minutes") 
 
-    # plt.imshow(square_I_list, vmax=1e6)
-    # plt.show()
+    plt.imshow(square_I_list, vmax=1e6)
+    plt.show()
 
     #2D sim
-    print("Starting 2D simulation")
-    image_size = 20 # Parameter - Image Size (for now = 40) 
-    image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
+    # print("Starting 2D simulation")
+    # image_size = 20 # Parameter - Image Size (for now = 40) 
+    # image_resolution = .2 # Parameter - Step size of image (for now = .5) / went from .5 to .2 to reduce distortion from rotation
 
-    Qs = create_q_vectors(image_size, image_resolution)
+    # Qs = create_q_vectors(image_size, image_resolution)
 
-    Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
+    # Qs_size = int(np.sqrt(len(Qs))) # this gives us the size of the image! eg. 3 -> 3x3 image
     
-    triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
-    molecule = get_coords_pdb("4bs7.pdb", "4bs7")
+    # triangle = plt.array([[1,1.5],[1.5,0],[0,1]]) # Parameter - Atoms
+    # molecule = get_coords_pdb("4bs7.pdb", "4bs7")
 
-    f_j = 1
+    # f_j = 1
 
-    num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
-    Tu = create_Tu_vectors(num_cells,cell_size)
+    # num_cells, cell_size= 5, determine_cell_size(molecule) # Parameter - Tu Vectors size 
+    # Tu = create_Tu_vectors(num_cells,cell_size)
 
-    degrees = 0
-    theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
+    # degrees = 0
+    # theta = degrees * np.pi / 180 # Parameter - theta degrees (rad) to rotate vectors
 
-    a = .003 # Parameter - value for the background, decent results are between .001 to .009
+    # a = .003 # Parameter - value for the background, decent results are between .001 to .009
 
-    I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
+    # I_list = get_I_values_no_loop(Qs, molecule, Tu, f_j,theta) # Computing intensity values
 
-    I_list = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt", I_list,np.linalg.norm(Qs,axis=1),100)
-    #I_list = bgnoise.add_background_water_offset(I_list,np.linalg.norm(Qs,axis=1))
+    # I_list = bgnoise.add_background_waterfile("gauss_bg_for_2Dcase.txt", I_list,np.linalg.norm(Qs,axis=1),100)
+    # #I_list = bgnoise.add_background_water_offset(I_list,np.linalg.norm(Qs,axis=1))
                                                             
-    square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
+    # square_I_list = plt.reshape(I_list, (Qs_size,Qs_size)) # reshaping list into a square 
     
-    #spot_count = count_spots(I_list, square_I_list)
+    # #spot_count = count_spots(I_list, square_I_list)
 
-    plt.imshow(square_I_list,vmax=1e6)
-    plt.show()
+    # plt.imshow(square_I_list,vmax=1e6)
+    # plt.show()
 
     # Background movie! going from a = 0 to 0.06 in steps of .001
     # for i in np.arange(0,.06,.001):

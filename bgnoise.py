@@ -2,21 +2,24 @@ import numpy as np
 import scipy as sp
 # Background functions
 
-def add_background_waterfile(bg_file, I_list, Q_magnitude,intensity=100):
+def add_background_file(bg_file, Q_magnitude,intensity=1):
     '''
-    Uses interpolation to layer water background as a function on top of intensity values
+    Uses interpolation to layer background files over array of intensity values
         Parameters:
             bg_file: string path to background .txt file
-            I_list: 1D array of image intensities
-            Q_magnitude: 1D array of magnitudes from Q-vectors
+            I_list: 1D array of image intensities (x-coords)
+            Q_magnitude: 1D array of magnitudes from Q-vectors (y-coords)
             intensity: intensity of the background (default=100)
         Returns: 
             List of intensity values with background added to it 
     '''
     qmags, I_vals = np.loadtxt(bg_file).T
+    #qmags = qmags *2 
     interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value="extrapolate")
     new_intensities = interpolated_func(Q_magnitude)
-    return new_intensities*intensity + I_list
+
+    print("Getting background")
+    return new_intensities*intensity 
     
 def add_background_water_offset(I_list, Q_magnitude, lower_bound=5, upper_bound=10, intensity=1e5):
     '''
