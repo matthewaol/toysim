@@ -337,7 +337,7 @@ def test_chunk_transform():
     test_qs = np.random.random((5000,3))
     test_atoms = np.random.random((1000,3))
     test_Tu = np.random.random((500,3))
-    rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
+    rand_rot_mat = sp.spatial.transform.Rotation.random(1)
     rotat_mat = rand_rot_mat.as_matrix()[0]
 
     mol = molecular_transform_no_loop_array_3d(test_qs,test_atoms,rotat_mat)
@@ -389,15 +389,15 @@ def get_I_values_no_loop_3d(Qs, Atoms, Tu, rotation_m):
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
-def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,chunk_size): 
+def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,molec_chunk_size,lat_chunk_size): 
     
     print("Computing intensities")
 
     print("Computing Molecular transform")
-    a_molecular = chunk_transform(Qs, Atoms, rotation_m,chunk_size)
+    a_molecular = chunk_transform(Qs, Atoms, rotation_m,molec_chunk_size)
 
     print("Computing Lattice transform")
-    a_lattice = chunk_transform(Qs, Tu, rotation_m,chunk_size,True)
+    a_lattice = chunk_transform(Qs, Tu, rotation_m,lat_chunk_size,True)
     a_total = a_molecular * a_lattice
     
     print("Finished intensities")
@@ -457,14 +457,17 @@ if __name__ == '__main__':
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
     rotat_mat = rand_rot_mat.as_matrix()[0]
 
+    rotat_mat=1
     sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
 
-    Qs = create_q_vectors_3d(20,.2)
-    Tu = create_Tu_vectors_3d(20, determine_cell_size(sample_atoms))
+    vecs = create_q_vectors_3d(20,.2)
+    Tu = create_Tu_vectors_3d(8, determine_cell_size(sample_atoms))
 
-    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70)
-    
+    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70, 20)
     background = bgnoise.add_background_file("randomstols/water_014.stol",np.linalg.norm(qvecs,axis=1))
+    
+    I_list
+    #I_list = bgnoise.adjust_background_list(I_list, background, 60)
     
     I_size = int(np.sqrt(len(I_list)))
     square_I_list = np.reshape(I_list, (img_sh))
@@ -475,6 +478,7 @@ if __name__ == '__main__':
 
     plt.imshow(square_I_list, vmax=1e6)
     plt.show()
+    from IPython import embed;embed()
 
     #2D sim
     # print("Starting 2D simulation")

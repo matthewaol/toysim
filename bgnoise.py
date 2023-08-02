@@ -2,6 +2,20 @@ import numpy as np
 import scipy as sp
 # Background functions
 
+
+def add_noise_poisson(I_list, photon_num=5000): #notworking yet
+    #probabilities =  I_list / I_list.sum()
+    #multi = np.random.multinomial(photon_num, probabilities.ravel(), len(I_list))
+    # do p = I_list / I_list / I_list.sum() -> itll give us some probabilities that sum up to 1
+    # do a multinomial(num of photons, p.ravel()) 
+    # return new I_list
+    poisson_dist = np.random.poisson(photon_num,len(I_list))
+    return poisson_dist
+ 
+def adjust_background_list(I_list, background_list, percentile): 
+    s = np.percentile(I_list,percentile)
+    return background_list * s / background_list.max() + I_list
+
 def add_background_file(bg_file, Q_magnitude,intensity=1):
     '''
     Uses interpolation to layer background files over array of intensity values
@@ -14,8 +28,8 @@ def add_background_file(bg_file, Q_magnitude,intensity=1):
             List of intensity values with background added to it 
     '''
     qmags, I_vals = np.loadtxt(bg_file).T
-    #qmags = qmags *2 
-    interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value="extrapolate")
+    qmags = qmags *2 
+    interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value=0, bounds_error=False)
     new_intensities = interpolated_func(Q_magnitude)
 
     print("Getting background")
