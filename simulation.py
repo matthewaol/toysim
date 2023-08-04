@@ -396,6 +396,21 @@ def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,molec_chunk_size,la
     print("Computing Molecular transform")
     a_molecular = chunk_transform(Qs, Atoms, rotation_m,molec_chunk_size)
 
+    q_mags = np.linalg.norm(Qs,axis=1) 
+    F = np.sqrt(a_molecular.real**2 + a_molecular.imag**2)
+    K_sol = 0.85
+    B_sol = 200
+    exp_term = np.exp(-B_sol * q_mags**2 / 4) 
+
+    theta = np.arctan(a_molecular.imag / a_molecular.real)
+
+    F = (1-K_sol*exp_term) * F
+
+    a_molecular.real = F * np.cos(theta) 
+    a_molecular.imag = F * np.sin(theta) 
+
+
+
     print("Computing Lattice transform")
     a_lattice = chunk_transform(Qs, Tu, rotation_m,lat_chunk_size,True)
     a_total = a_molecular * a_lattice
@@ -458,25 +473,28 @@ if __name__ == '__main__':
     rotat_mat = rand_rot_mat.as_matrix()[0]
 
     rotat_mat=1
-    sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)
+    sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)[:200]
 
     vecs = create_q_vectors_3d(20,.2)
-    Tu = create_Tu_vectors_3d(8, determine_cell_size(sample_atoms))
+    Tu = create_Tu_vectors_3d(5, determine_cell_size(sample_atoms))
 
-    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 70, 20)
+
+    I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 35, 50)
+    #B_I_list = bgnoise.add_background_exp_no_loop(I_list,qvecs,a=4)
+
     background = bgnoise.add_background_file("randomstols/water_014.stol",np.linalg.norm(qvecs,axis=1))
     
-    I_list
-    #I_list = bgnoise.adjust_background_list(I_list, background, 60)
+    shaped_I_list = np.reshape(I_list, (img_sh))
+    shaped_background = np.reshape(background, (img_sh))
     
-    I_size = int(np.sqrt(len(I_list)))
-    square_I_list = np.reshape(I_list, (img_sh))
+    random_rad = np.random.randint(150,600)
 
+    shaped_background_I_list = bgnoise.scale_background_list_r(shaped_I_list, shaped_background,300)
 
     end = time.time()
     print("Program took", str(end-start), "secs or", ((end-start)/60 ), "minutes") 
 
-    plt.imshow(square_I_list, vmax=1e6)
+    plt.imshow(shaped_background_I_list, vmax=1e10)
     plt.show()
     from IPython import embed;embed()
 

@@ -12,9 +12,25 @@ def add_noise_poisson(I_list, photon_num=5000): #notworking yet
     poisson_dist = np.random.poisson(photon_num,len(I_list))
     return poisson_dist
  
-def adjust_background_list(I_list, background_list, percentile): 
+def scale_background_list_p(I_list, background_list, percentile): 
     s = np.percentile(I_list,percentile)
-    return background_list * s / background_list.max() + I_list
+    return background_list * s / background_list.max() 
+
+def scale_background_list_r(shaped_I_list, shaped_background_list, radius): 
+    Y,X = np.indices(shaped_background_list.shape) # creates indices of background img
+
+    ycent, xcent = [x/2. for x in shaped_I_list.shape] # gets the center of background in xy coords
+
+    R = np.sqrt((X-xcent)**2 + (Y-ycent)**2) # computes distances from each coordinate to the center
+
+    radius_slice = np.logical_and( R > radius-20, R < radius+20) # gets the indices of sliced radius
+
+    radius_bg = shaped_background_list[radius_slice].mean() 
+    radius_I = shaped_I_list[radius_slice].max()
+
+    scale_factor = radius_I / radius_bg
+    
+    return (shaped_I_list / scale_factor) + shaped_background_list
 
 def add_background_file(bg_file, Q_magnitude,intensity=1):
     '''
@@ -28,7 +44,7 @@ def add_background_file(bg_file, Q_magnitude,intensity=1):
             List of intensity values with background added to it 
     '''
     qmags, I_vals = np.loadtxt(bg_file).T
-    qmags = qmags *2 
+    qmags = qmags * 2 
     interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value=0, bounds_error=False)
     new_intensities = interpolated_func(Q_magnitude)
 
