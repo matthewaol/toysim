@@ -8,12 +8,28 @@ import numexpr as ne
 
 import time 
 from Bio.PDB.PDBParser import PDBParser
+from iotbx import pdb
 
+from cctbx import sgtbx
 import bgnoise
 import models
 import detectors
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.detector import DetectorFactory 
+
+def find_sym_info(file_name): # returns space group info 
+    P = pdb.input(file_name)
+    symbol = P.crystal_symmetry().space_group_info().type().lookup_symbol()
+    return symbol
+
+def get_sym_operators(space_group_info): # gets arrays of sym operators
+    sg = sgtbx.space_group_info(space_group_info)
+    gr = sg.group()
+    Ops = gr.all_ops()
+    trans = [np.reshape(O.t().as_double(), (1,3)) for O in Ops] 
+    rots = [np.reshape(O.r().as_double(), (3,3)) for O in Ops]
+
+    return np.array(trans), np.array(rots)
 
 def get_coords_pdb(file_name, structure_id,get_only_xy=True):
     '''
@@ -28,13 +44,27 @@ def get_coords_pdb(file_name, structure_id,get_only_xy=True):
     print("Getting atom coordinates from molecule")
     parser = PDBParser(PERMISSIVE=1)
     structure = parser.get_structure(structure_id,file_name)
+
+    space_group = find_sym_info(file_name)
+    sym_ops = get_sym_operators(space_group)
+
+    atoms = structure.get_atoms()
+
+    list_of_coords = [atom.get_coord() for atom in atoms]
     
-    list_of_coords = [atom.get_coord() for atom in structure.get_atoms()]
+    print("Applying symmetry operators")
+    translated = []
     
+    #still implementing
+    for trans in sym_ops[0]: 
+        for rot in sym_ops[1]:
+            translated.append(np.dot((list_of_coords + trans), rot))
+
     if get_only_xy is True: 
         list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1))
-        
-    return np.array(list_of_coords)
+
+    from IPython import embed;embed()
+    return np.array(translated)
 
 def show_image(square_I_list): 
     '''
@@ -110,6 +140,17 @@ def create_Tu_vectors_3d(num_cells, cell_size=1):
         for y in range(num_cells):
                 for z in range(num_cells):
                     Tu.append([x*cell_size,y*cell_size,z*cell_size])
+    return np.array(Tu)
+
+def create_Tu_vectors_3d_basis(num_cells, a_vec, b_vec, c_vec): 
+    ...
+    # Tu_vec = x* a_vec + y* b_vec + z*c_vec
+    # a_vec are 1d numpy arrays
+    Tu = []
+    for x in range(num_cells): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
+        for y in range(num_cells):
+            for z in range(num_cells):
+                Tu.append([x*a_vec,y*b_vec,z*c_vec])
     return np.array(Tu)
 
 def create_Tu_vectors_3d_tetra(num_cells,a,c): 
@@ -396,6 +437,7 @@ def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,molec_chunk_size,la
     print("Computing Molecular transform")
     a_molecular = chunk_transform(Qs, Atoms, rotation_m,molec_chunk_size)
 
+    # Solvent calculation
     q_mags = np.linalg.norm(Qs,axis=1) 
     F = np.sqrt(a_molecular.real**2 + a_molecular.imag**2)
     K_sol = 0.85
