@@ -22,6 +22,13 @@ def find_sym_info(file_name): # returns space group info
     symbol = P.crystal_symmetry().space_group_info().type().lookup_symbol()
     return symbol
 
+def get_M( pdb_file):
+    P = pdb.input(pdb_file)
+    uc = P.crystal_symmetry().unit_cell()
+    Mi = np.reshape (uc.orthogonalization_matrix(), (3,3))
+    M = np.linalg.inv(Mi)
+    return M
+
 def get_sym_operators(space_group_info): # gets arrays of sym operators
     sg = sgtbx.space_group_info(space_group_info)
     gr = sg.group()
@@ -46,25 +53,45 @@ def get_coords_pdb(file_name, structure_id,get_only_xy=True):
     structure = parser.get_structure(structure_id,file_name)
 
     space_group = find_sym_info(file_name)
-    sym_ops = get_sym_operators(space_group)
+    trans_ops, rot_ops = get_sym_operators(space_group)
 
     atoms = structure.get_atoms()
 
-    list_of_coords = [atom.get_coord() for atom in atoms]
+    list_of_coords = np.array([atom.get_coord() for atom in atoms])
+
+    M = get_M(file_name)
+
+    fractional_coords = np.dot(list_of_coords, M)
     
     print("Applying symmetry operators")
-    translated = []
-    
-    #still implementing
-    for trans in sym_ops[0]: 
-        for rot in sym_ops[1]:
-            translated.append(np.dot((list_of_coords + trans), rot))
 
-    if get_only_xy is True: 
+    all_coords = []
+    for t, r in zip(trans_ops,rot_ops): 
+        x = np.dot(fractional_coords,r) + t
+        big_x = np.dot(x, np.linalg.inv(M))
+        all_coords.append(big_x)
+
+    all_coords = np.vstack(all_coords)
+
+
+    #translated = []
+    # for trans in trans_ops:
+    #     from IPython import embed;embed()
+    #     translated.append(trans + fractional_coords)
+
+    # translated = np.array(translated).reshape(len(sym_ops[0]) * len(list_of_coords),3)
+
+    # rotated_n_translated = []
+    # for rot in rot_ops:
+    #     rotated_n_translated.append(np.dot(translated,rot))
+
+    # rotated_n_translated = np.array(translated).reshape(len(sym_ops[1]) * len(list_of_coords),3)
+
+    if get_only_xy: 
         list_of_coords = np.array(np.delete(list_of_coords, 2, axis=1))
 
-    from IPython import embed;embed()
-    return np.array(translated)
+    return all_coords
+
 
 def show_image(square_I_list): 
     '''
@@ -150,8 +177,9 @@ def create_Tu_vectors_3d_basis(num_cells, a_vec, b_vec, c_vec):
     for x in range(num_cells): # Creates Tu vectors ranging from [0,0] to [Tu_size,Tu_size]
         for y in range(num_cells):
             for z in range(num_cells):
-                Tu.append([x*a_vec,y*b_vec,z*c_vec])
-    return np.array(Tu)
+                Tu.append([x*a_vec + y*b_vec + z*c_vec])
+
+    return np.array(Tu)[:,0,:]
 
 def create_Tu_vectors_3d_tetra(num_cells,a,c): 
     Tu = []
@@ -202,6 +230,9 @@ def molecular_transform_no_loop(Q,Atoms,f_j,theta): # takes in a single Q vector
     i_real, i_imag = a*f_j, b*f_j
     return i_real + i_imag*1j
 
+# assign one unit/thread/worker one pixel, do the q-vec cos/sin computation in the gpu 
+# instead of being 8k * 6m operations, it'll be 8k operations
+
 def molecular_transform_no_loop_array(Qs,Atoms,f_j,theta): # takes in an array of Q instead of a single Q
     a = b = 0
     rotation_m = np.array([[np.cos(theta), -np.sin(theta)],
@@ -244,7 +275,6 @@ def molecular_transform_no_loop_array_3d(Qs, Atoms,rotation_m):
 
     return i_real + i_imag*1j
 
-#@profile
 def molecular_transform_chunks(Qs, Atoms, rotation_m, chunk_size): 
     a2 = np.zeros(len(Qs))
     b2 = np.zeros(len(Qs))
@@ -344,11 +374,12 @@ def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes 
     i_real, i_imag = a, b
     return i_real + i_imag * 1j
 
+@profile
 def chunk_transform(Qs,vectors,rotation_m,chunk_size,f_j_is1=True):
     a2 = np.zeros(len(Qs))
     b2 = np.zeros(len(Qs))
     
-    if f_j_is1 is not True:
+    if not f_j_is1:
         Qs_mag = np.linalg.norm(Qs,axis=1)
         exp_arg = Qs_mag**2 / 4 * -10.7
         f_j = 7 * np.exp(exp_arg)
@@ -367,7 +398,7 @@ def chunk_transform(Qs,vectors,rotation_m,chunk_size,f_j_is1=True):
 
         rotated_u = np.dot(rotation_m, chunk.T) 
         chunk_phase = np.dot(Qs, rotated_u)
-
+        # copy a2,b2, atoms to gpu
         a2 += np.sum(ne.evaluate("cos(chunk_phase)"), axis=1) 
         b2 += np.sum(ne.evaluate("sin(chunk_phase)"), axis=1)
 
@@ -443,14 +474,11 @@ def get_I_values_no_loop_3d_chunks(Qs, Atoms, Tu, rotation_m,molec_chunk_size,la
     K_sol = 0.85
     B_sol = 200
     exp_term = np.exp(-B_sol * q_mags**2 / 4) 
-
     theta = np.arctan(a_molecular.imag / a_molecular.real)
-
     F = (1-K_sol*exp_term) * F
 
     a_molecular.real = F * np.cos(theta) 
     a_molecular.imag = F * np.sin(theta) 
-
 
 
     print("Computing Lattice transform")
@@ -508,8 +536,11 @@ if __name__ == '__main__':
     print("Bringing in Qs from detector")
     beam = BeamFactory.from_dict(models.beam) 
     detector = DetectorFactory.from_dict(models.pilatus)
+    # TO DO: Shift detector z
+    # Add Mosaic texture
+    # 
     qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
-    qvecs = qvecs[0]
+    qvecs = qvecs[0] # specifies q-vectors 
 
     rand_rot_mat = sp.spatial.transform.Rotation.random(1,random_state=0)
     rotat_mat = rand_rot_mat.as_matrix()[0]
@@ -518,8 +549,12 @@ if __name__ == '__main__':
     sample_atoms = get_coords_pdb("4bs7.pdb", "temp", False)[:200]
 
     vecs = create_q_vectors_3d(20,.2)
-    Tu = create_Tu_vectors_3d(5, determine_cell_size(sample_atoms))
 
+    M = get_M("4bs7.pdb")
+    Mi = np.linalg.inv(M)
+    a,b,c = Mi.T
+
+    Tu = create_Tu_vectors_3d_basis(5,a,b,c)
 
     I_list = get_I_values_no_loop_3d_chunks(qvecs, sample_atoms, Tu, rotat_mat, 35, 50)
     #B_I_list = bgnoise.add_background_exp_no_loop(I_list,qvecs,a=4)
@@ -536,9 +571,9 @@ if __name__ == '__main__':
     end = time.time()
     print("Program took", str(end-start), "secs or", ((end-start)/60 ), "minutes") 
 
-    plt.imshow(shaped_background_I_list, vmax=1e10)
+    plt.imshow(shaped_background_I_list, vmax=20)
     plt.show()
-    from IPython import embed;embed()
+    from IPython import embed;embed() 
 
     #2D sim
     # print("Starting 2D simulation")
