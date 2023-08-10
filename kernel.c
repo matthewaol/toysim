@@ -11,12 +11,11 @@ void cos_arr(float* a, float* b, float* c, int a_size) {
 
 __kernel void cos_arr(__global float* a,__global float* b,__global float* c, int a_size) {
       	int gi = get_global_id(0);
-	float a_val = a[gi];
+		float a_val = a[gi];
         b[gi] = native_cos(a_val);
         c[gi] = native_sin(a_val);
-        
-	
 }
+
 
 int main() {
 	int a_size = 100;
