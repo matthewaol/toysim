@@ -15,7 +15,89 @@ import bgnoise
 import models
 import detectors
 from dxtbx.model.beam import BeamFactory
-from dxtbx.model.detector import DetectorFactory 
+from dxtbx.model.detector import DetectorFactory
+
+import numpy as np
+import pyopencl as cl
+import pyopencl.array as clarray
+
+
+def get_context_queue():
+    #   list the platforms
+    platforms = cl.get_platforms()
+    print("Found platforms (will use first listed):", platforms)
+    #   select the gpu
+    my_gpu = platforms[0].get_devices(
+        device_type=cl.device_type.GPU)
+    assert (my_gpu)
+    print("Found GPU(s):", my_gpu)
+    #   create the context for the gpu, and the corresponding queue
+    context = cl.Context(devices=my_gpu)
+    queue = cl.CommandQueue(context)
+    return context, queue
+
+
+phase_sum_kernel="""
+__kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int num_atoms,
+    __global double* real_out, __global double* imag_out) {
+   // fill in!
+}
+
+"""
+
+class GPUHelper:
+
+    def __init__(self, Q, context, queue):
+        self.dt = np.float64
+        self.queue = queue
+        self.context = context
+
+        self.q_vecs = self.flatten(Q)  # q vectors host array
+        self.real_out = self.flatten(np.zeros(len(Q)))
+        self.imag_out = self.flatten(np.zeros(len(Q)))
+
+        self.q_dev = None  # q vectors device array
+        self.real_out_dev = None  # real output device array
+        self.imag_out_dev = None  # imag output device array
+
+        self._allocate_arrays()
+
+        # phase_sum_kernel is the string
+        self.program = cl.Program(self.context, phase_sum_kernel).build()
+        self.program.phase_sum.set_scalar_arg_dtypes([None, None, np.int32, None, None])
+
+    def flatten(self, np_vec):
+        np_vec_1d = np_vec.ravel().astype(self.dt)
+        return np.ascontiguousarray(np_vec_1d)
+
+    def _allocate_arrays(self):
+        self.q_dev = clarray.to_device(self.queue, self.q_vecs)
+        self.real_out_dev = clarray.to_device(self.queue, self.real_out)
+        self.imag_out_dev = clarray.to_device(self.queue, self.imag_out)
+
+    def phase_sum(self, atoms):
+        num_atoms = len(atoms)
+        atoms_dev = clarray.to_device(self.queue, self.flatten(atoms))
+
+        # run kernel
+        # ... ...
+        num_pix = int(len(self.q_vecs) / 3.)
+        self.program.phase_sum(self.queue, (num_pix,), None,
+                               self.q_dev.data,
+                               atoms_dev.data,
+                               np.int32(num_atoms),
+                               self.real_out_dev.data, self.imag_out_dev.data)
+
+        # copy real/imag results back to host arrays
+        cl.enqueue_copy(self.queue, self.real_out, self.real_out_dev)
+        cl.enqueue_copy(self.queue, self.imag_out, self.imag_out_dev)
+
+        # return real,imag parts:
+
+        # TODO: de-allocate atoms_dev  (delete it from the GPU)
+
+        return self.real_out, self.imag_out
+
 
 def find_sym_info(file_name): # returns space group info 
     P = pdb.input(file_name)
@@ -372,6 +454,26 @@ def lattice_transform_no_loop_array_3d(Qs, Tu, rotation_m): # 3d Qs & Tu, takes 
     b = np.sum(sin_phase, axis = 1)
 
     i_real, i_imag = a, b
+    return i_real + i_imag * 1j
+
+
+def gpu_transform(gpu_helper, vectors, rotation_m, f_j_is1=True):
+    if not f_j_is1:
+        # TODO: store f_j as class attribute of gpu_helper
+        num_q = int(len(gpu_helper.q_vecs) / 3)
+        Qs = np.reshape(gpu_helper.q_vecs, (num_q, 3))
+        Qs_mag = np.linalg.norm(Qs, axis=1)
+        exp_arg = Qs_mag ** 2 / 4 * -10.7
+        f_j = 7 * np.exp(exp_arg)
+    else:
+        f_j = 1
+
+    # rotate the atom
+    rotated_u = np.dot(rotation_m, vectors.T)
+    # run the GPU kernel
+    a2, b2 = gpu_helper.phase_sum(rotated_u)
+
+    i_real, i_imag = a2 * f_j, b2 * f_j
     return i_real + i_imag * 1j
 
 def chunk_transform(Qs,vectors,rotation_m,chunk_size,f_j_is1=True):
