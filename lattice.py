@@ -38,7 +38,6 @@ def create_Tu_vectors_3d(num_cells, cell_size=1):
 
 
 def create_Tu_vectors_3d_basis(num_cells, a_vec, b_vec, c_vec):
-    ...
     # Tu_vec = x* a_vec + y* b_vec + z*c_vec
     # a_vec, b_vec, c_vec are 1d numpy arrays
     Tu = []
