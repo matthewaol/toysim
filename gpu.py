@@ -25,7 +25,6 @@ __kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int
     __global double* real_out, __global double* imag_out) {
     double real_sum = 0;
     double imag_sum = 0;
-    twopi = 2 * M_PI_F
 
 
     int q_idx = get_global_id(0);
@@ -36,20 +35,20 @@ __kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int
     double q_z = q_vecs[q_idx * 3+2];
 
     
-    for (int i_atom=0; i_atom < n_atom; i_atom++){
+    for (int i_atom=0; i_atom < num_atoms; i_atom++){
         // use i_atom to get atom_x, atom_y, atom_z;
         double atom_x = atom_vecs[i_atom * 3]; 
         double atom_y = atom_vecs[i_atom * 3+1];
         double atom_z = atom_vecs[i_atom * 3+2];
-        double phase = atom_x*(q_x*twopi) + atom_y*(q_y*twopi) + atom_z*(q_z*twopi);
+        double phase = atom_x*(q_x) + atom_y*(q_y) + atom_z*(q_z);
         double cos_term = native_cos(phase);
         double sin_term = native_sin(phase);
         real_sum += cos_term;
         imag_sum += sin_term;
     }
 
-    a2[q_idx] = real_sum;
-    b2[q_idx] = imag_sum;
+    real_out[q_idx] = real_sum;
+    imag_out[q_idx] = imag_sum;
 }
 """
 
@@ -97,8 +96,8 @@ class GPUHelper:
                                self.real_out_dev.data, self.imag_out_dev.data)
 
         # copy real/imag results back to host arrays
-        cl.enqueue_copy(self.queue, self.real_out, self.real_out_dev)
-        cl.enqueue_copy(self.queue, self.imag_out, self.imag_out_dev)
+        cl.enqueue_copy(self.queue, self.real_out,self.real_out_dev.data)
+        cl.enqueue_copy(self.queue, self.imag_out, self.imag_out_dev.data)
 
         # return real,imag parts:
 

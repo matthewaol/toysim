@@ -13,7 +13,7 @@ import gpu
 
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.detector import DetectorFactory
-from toysim import molecule, lattice
+import molecule, lattice
 
 import numpy as np
 
@@ -166,9 +166,9 @@ def crystal_intensities_gpu(gpu_helper, Qs, Atoms, Tu, rotation_m,
     """
     # simulation variables
 
-    print("Computing intensities")
+    print("Computing intensities with the GPU")
     print("Computing Molecular transform")
-    a_molecular = gpu_transform(gpu_helper, Qs, Atoms, rotation_m)
+    a_molecular = gpu_transform(gpu_helper, Atoms, rotation_m)
 
     # Solvent calculation
     if solvent_term:
@@ -181,7 +181,7 @@ def crystal_intensities_gpu(gpu_helper, Qs, Atoms, Tu, rotation_m,
         a_molecular = F*(np.cos(theta) + 1j* np.sin(theta))
 
     print("Computing Lattice transform")
-    a_lattice = gpu_transform(gpu_helper, Qs, Tu, rotation_m, f_j_is1=True)
+    a_lattice = gpu_transform(gpu_helper, Tu, rotation_m, f_j_is1=True)
 
     a_total = a_molecular * a_lattice
     
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     Bfactor_A = .5  # overall crystal B-factor
     Rotation_seed = 0  # specifies a randomly sampled rotation matrix
     PDB_file = "4bs7.pdb"  # molecular coordinates
-    background_file = "randomstols/water_014.stol"  # sets the background model
+    background_file = "/mnt/home1/matdac/toysim/randomstols/water_014.stol"  # sets the background model
     random_rad = 400  # random radius on detector to scale background at
     num_cells = 7  # number of unit cells along each dimension
     n_atoms = None  # set to an int to only simulate that many atoms
@@ -232,12 +232,13 @@ if __name__ == '__main__':
     Tu = lattice.create_Tu_vectors_3d_basis(num_cells, a, b, c)
     #Tu = lattice.create_Tu_vectors_3d(num_cells, cell_size=200)
 
-    # print("Loading in the GPU")
+    print("Loading in the GPU")
     # context, queue = gpu.get_context_queue()
     # the_gpu = gpu.GPUHelper(qvecs, context, queue)
 
-    #I_gpu = crystal_intensities_gpu(the_gpu, qvecs, sample_atoms, Tu, 
-    #                                rotate_mat, K_sol, B_sol, solvent_term=True)
+    #I_gpu = crystal_intensities_gpu(the_gpu, qvecs, sample_atoms, Tu,
+                                 #   rotate_mat, K_sol, B_sol, solvent_term=True)
+
     I = crystal_intensities(qvecs, sample_atoms, Tu, rotate_mat,
                             lat_chunk_size=20, molec_chunk_size=20,
                             K_sol=K_sol, B_sol=B_sol, solvent_term=True)
