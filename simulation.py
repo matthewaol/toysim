@@ -9,6 +9,8 @@ import time
 import bgnoise
 import models
 import detectors
+import gpu
+
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.detector import DetectorFactory
 from toysim import molecule, lattice
@@ -121,7 +123,7 @@ def crystal_intensities(Qs, Atoms, Tu, rotation_m,
 
     print("Computing intensities")
     print("Computing Molecular transform")
-    a_molecular = chunk_transform(Qs, Atoms, rotation_m, molec_chunk_size, f_j_is1=True)
+    a_molecular = chunk_transform(Qs, Atoms, rotation_m, molec_chunk_size)
 
     # Solvent calculation
     if solvent_term:
@@ -141,19 +143,64 @@ def crystal_intensities(Qs, Atoms, Tu, rotation_m,
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
+def crystal_intensities_gpu(gpu_helper, Qs, Atoms, Tu, rotation_m,
+                        K_sol=.85, B_sol=200,
+                        solvent_term=True):
+    """
+    Parameters
+    ----------
+    gpuhelper object
+    Qs
+    Atoms
+    Tu
+    rotation_m
+    molec_chunk_size
+    lat_chunk_size
+    K_sol
+    B_sol
+    solvent_term
+
+    Returns
+    -------
+    numpy array of intensities (of length equal to Qs)
+    """
+    # simulation variables
+
+    print("Computing intensities")
+    print("Computing Molecular transform")
+    a_molecular = gpu_transform(gpu_helper, Qs, Atoms, rotation_m)
+
+    # Solvent calculation
+    if solvent_term:
+        q_mags = np.linalg.norm(Qs,axis=1)
+        F = np.sqrt(a_molecular.real**2 + a_molecular.imag**2)
+        exp_term = np.exp(-B_sol * q_mags**2 / 4)
+        theta = np.arctan2(a_molecular.imag, a_molecular.real)
+        F = (1-K_sol*exp_term) * F
+
+        a_molecular = F*(np.cos(theta) + 1j* np.sin(theta))
+
+    print("Computing Lattice transform")
+    a_lattice = gpu_transform(gpu_helper, Qs, Tu, rotation_m, f_j_is1=True)
+
+    a_total = a_molecular * a_lattice
+    
+    print("Finished intensities")
+    return a_total.real**2 + a_total.imag**2
+
 #main
 if __name__ == '__main__':
     start = time.time()
     # PARAMETERS TO VARY IMAGE
     K_sol = 0.85  # solvent scale
     B_sol = 200  # solvent decay
-    Bfactor_A = 4  # overall crystal B-factor
-    Rotation_seed = 0  # soecfies a randomly sampled rotation matrix
-    PDB_file = "4bs7.pdb"  # moleculr coordinates
+    Bfactor_A = .5  # overall crystal B-factor
+    Rotation_seed = 0  # specifies a randomly sampled rotation matrix
+    PDB_file = "4bs7.pdb"  # molecular coordinates
     background_file = "randomstols/water_014.stol"  # sets the background model
-    random_rad = 300  # random radius on detector to scale background at
+    random_rad = 400  # random radius on detector to scale background at
     num_cells = 7  # number of unit cells along each dimension
-    n_atoms = 50  # set to an int to only simulate that many atoms
+    n_atoms = None  # set to an int to only simulate that many atoms
     # end PARAMETERS TO VARY IMAGE
 
     print("Starting 3D simulation")
@@ -165,7 +212,7 @@ if __name__ == '__main__':
     # Add Mosaic texture
 
     qvecs, img_sh = detectors.qxyz_from_det(detector, beam)
-    qvecs = qvecs[0]  # specifies q-vectors
+    qvecs = qvecs[0]  # specifies q-vectors on first detector
 
     rand_rot_mat = sp.spatial.transform.Rotation.random(1, random_state=Rotation_seed)
     rotate_mat = rand_rot_mat.as_matrix()[0]
@@ -173,6 +220,7 @@ if __name__ == '__main__':
     sample_atoms = molecule.get_coords_pdb(PDB_file, "temp", get_only_xy=False, apply_sym_ops=True)
     if n_atoms is not None:
         sample_atoms = sample_atoms[:n_atoms]
+    
 
     M = molecule.get_M(PDB_file)
     Mi = np.linalg.inv(M)
@@ -184,10 +232,16 @@ if __name__ == '__main__':
     Tu = lattice.create_Tu_vectors_3d_basis(num_cells, a, b, c)
     #Tu = lattice.create_Tu_vectors_3d(num_cells, cell_size=200)
 
+    # print("Loading in the GPU")
+    # context, queue = gpu.get_context_queue()
+    # the_gpu = gpu.GPUHelper(qvecs, context, queue)
+
+    #I_gpu = crystal_intensities_gpu(the_gpu, qvecs, sample_atoms, Tu, 
+    #                                rotate_mat, K_sol, B_sol, solvent_term=True)
     I = crystal_intensities(qvecs, sample_atoms, Tu, rotate_mat,
                             lat_chunk_size=20, molec_chunk_size=20,
                             K_sol=K_sol, B_sol=B_sol, solvent_term=True)
-
+    
     # add a B-factor decay to the intensities
     I = bgnoise.add_background_exp_no_loop(I, qvecs, a=Bfactor_A)
 
@@ -200,7 +254,7 @@ if __name__ == '__main__':
     background = np.reshape(background, img_sh)
 
     # scale the background at a random rad
-    total_I = bgnoise.scale_background_list_r(I, background, radius=random_rad)
+    total_I, scale_factor = bgnoise.scale_background_list_r(I, background, radius=random_rad)
 
     end = time.time()
     print("Program took %.1f sec or %.2f minutes" % (end-start, (end-start)/60))

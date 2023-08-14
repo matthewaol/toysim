@@ -31,7 +31,6 @@ def scale_background_list_r(shaped_I_list, shaped_background_list, radius):
     radius_I = shaped_I_list[radius_slice].max()
 
     scale_factor = radius_I / radius_bg
-    
     return (shaped_I_list / scale_factor) + shaped_background_list, scale_factor
 
 
@@ -47,7 +46,7 @@ def add_background_file(bg_file, Q_magnitude,intensity=1):
             List of intensity values with background added to it 
     '''
     qmags, I_vals = np.loadtxt(bg_file).T
-    qmags = qmags * 2 
+    #qmags = qmags * 2 
     interpolated_func = sp.interpolate.interp1d(qmags, I_vals,fill_value=0, bounds_error=False)
     new_intensities = interpolated_func(Q_magnitude)
 

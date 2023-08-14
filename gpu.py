@@ -67,8 +67,8 @@ class GPUHelper:
         self.q_dev = None  # q vectors device array
         self.real_out_dev = None  # real output device array
         self.imag_out_dev = None  # imag output device array
-
         self._allocate_arrays()
+
 
         # phase_sum_kernel is the string
         self.program = cl.Program(self.context, phase_sum_kernel).build()
