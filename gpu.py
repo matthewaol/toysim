@@ -25,7 +25,8 @@ __kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int
     __global double* real_out, __global double* imag_out) {
     double real_sum = 0;
     double imag_sum = 0;
-
+    
+    double twopi = 2 * 3.1415926535897932384626433;
 
     int q_idx = get_global_id(0);
 
@@ -40,7 +41,7 @@ __kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int
         double atom_x = atom_vecs[i_atom * 3]; 
         double atom_y = atom_vecs[i_atom * 3+1];
         double atom_z = atom_vecs[i_atom * 3+2];
-        double phase = atom_x*(q_x) + atom_y*(q_y) + atom_z*(q_z);
+        double phase = atom_x*q_x*twopi + atom_y*q_y*twopi + atom_z*q_z*twopi;
         double cos_term = native_cos(phase);
         double sin_term = native_sin(phase);
         real_sum += cos_term;
