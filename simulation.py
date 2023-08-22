@@ -199,7 +199,7 @@ if __name__ == '__main__':
     PDB_file = "4bs7.pdb"  # molecular coordinates
     background_file = "/mnt/home1/matdac/toysim/randomstols/water_014.stol"  # sets the background model
     random_rad = 400  # random radius on detector to scale background at
-    num_cells = 7  # number of unit cells along each dimension
+    num_cells = 3  # number of unit cells along each dimension
     n_atoms = None  # set to an int to only simulate that many atoms
     # end PARAMETERS TO VARY IMAGE
 
@@ -233,12 +233,20 @@ if __name__ == '__main__':
     #Tu = lattice.create_Tu_vectors_3d(num_cells, cell_size=200)
 
     print("Loading in the GPU")
-    # context, queue = gpu.get_context_queue()
-    # the_gpu = gpu.GPUHelper(qvecs, context, queue)
+    context, queue = gpu.get_context_queue()
+    the_gpu = gpu.GPUHelper(qvecs, context, queue)
 
-    #I_gpu = crystal_intensities_gpu(the_gpu, qvecs, sample_atoms, Tu,
-                                 #   rotate_mat, K_sol, B_sol, solvent_term=True)
+    I_gpu = crystal_intensities_gpu(the_gpu, qvecs, sample_atoms, Tu,
+                                   rotate_mat, K_sol, B_sol, solvent_term=True)
 
+    I_gpu = np.reshape(I_gpu, img_sh)
+
+    m = I_gpu.mean()
+    s = I_gpu.std()
+    vmin = m - s
+    vmax = m + 3 * s
+    plt.imshow(I_gpu, vmax=vmax, vmin=vmin)
+    plt.show()
     I = crystal_intensities(qvecs, sample_atoms, Tu, rotate_mat,
                             lat_chunk_size=20, molec_chunk_size=20,
                             K_sol=K_sol, B_sol=B_sol, solvent_term=True)
