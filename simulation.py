@@ -141,6 +141,7 @@ def crystal_intensities(Qs, Atoms, Tu, rotation_m,
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
+
 #main
 if __name__ == '__main__':
     start = time.time()
