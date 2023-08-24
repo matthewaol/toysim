@@ -141,7 +141,7 @@ def crystal_intensities(Qs, Atoms, Tu, rotation_m,
     print("Finished intensities")
     return a_total.real**2 + a_total.imag**2
 
-
+#main
 if __name__ == '__main__':
     start = time.time()
     # PARAMETERS TO VARY IMAGE
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     background_file = "randomstols/water_014.stol"  # sets the background model
     random_rad = 300  # random radius on detector to scale background at
     num_cells = 7  # number of unit cells along each dimension
-    n_atoms = None  # set to an int to only simulate that many atoms
+    n_atoms = 50  # set to an int to only simulate that many atoms
     # end PARAMETERS TO VARY IMAGE
 
     print("Starting 3D simulation")
