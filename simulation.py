@@ -6,9 +6,9 @@ import scipy as sp
 import numexpr as ne
 
 import time 
-import bgnoise
-import models
-import detectors
+from toysim import bgnoise
+from toysim import models
+from toysim import detectors
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.detector import DetectorFactory
 from toysim import molecule, lattice
