@@ -41,7 +41,7 @@ __kernel void phase_sum(__global double* q_vecs, __global double* atom_vecs, int
         double atom_x = atom_vecs[i_atom * 3]; 
         double atom_y = atom_vecs[i_atom * 3+1];
         double atom_z = atom_vecs[i_atom * 3+2];
-        double phase = atom_x*q_x*twopi + atom_y*q_y*twopi + atom_z*q_z*twopi;
+        double phase = twopi*(atom_x*q_x + atom_y*q_y + atom_z*q_z);
         double cos_term = native_cos(phase);
         double sin_term = native_sin(phase);
         real_sum += cos_term;
@@ -97,11 +97,8 @@ class GPUHelper:
                                self.real_out_dev.data, self.imag_out_dev.data)
 
         # copy real/imag results back to host arrays
-        cl.enqueue_copy(self.queue, self.real_out,self.real_out_dev.data)
+        cl.enqueue_copy(self.queue, self.real_out, self.real_out_dev.data)
         cl.enqueue_copy(self.queue, self.imag_out, self.imag_out_dev.data)
 
-        # return real,imag parts:
-
-        # TODO: de-allocate atoms_dev  (delete it from the GPU)
-
+        # TODO figure out why copy fixed the issues...
         return self.real_out, self.imag_out

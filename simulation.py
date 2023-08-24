@@ -6,7 +6,7 @@ import scipy as sp
 import numexpr as ne
 
 import time 
-import gpu
+from toysim import gpu
 from toysim import bgnoise
 from toysim import models
 from toysim import detectors
@@ -42,7 +42,7 @@ def gpu_transform(gpu_helper, vectors, rotation_m, f_j_is1=True):
         f_j = 1
 
     # rotate the atom
-    rotated_u = np.dot(rotation_m, vectors.T)
+    rotated_u = np.dot(rotation_m, vectors.T).T # Note, important transpose
     # run the GPU kernel
     a2, b2 = gpu_helper.phase_sum(rotated_u)
 
