@@ -3,6 +3,7 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.array as clarray
 
+
 def get_context_queue(name="V100"):
     #   list the platforms
     platforms = cl.get_platforms()
