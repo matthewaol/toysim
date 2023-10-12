@@ -1,6 +1,10 @@
 # x-ray diffraction data simulator
+# small-scale 2d simulation
+![image](https://github.com/matthewaol/toysim/assets/51929639/68ad1286-cfd7-4548-a369-f44d33391e7c)
+# realistic simulation w/ water
+![Screenshot from 2023-10-12 11-14-34](https://github.com/matthewaol/toysim/assets/51929639/df5d27a6-f171-4ed2-8579-892e725a06af)
 
-to use,
+# instructions 
 clone the repository `git clone <url>`
 then
 1. create a directory for your developer environment `cd ~` `mkdir dials` `cd dials`
