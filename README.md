@@ -1,5 +1,5 @@
 # x-ray diffraction data simulator
-# simulation w/ scattering due to water
+simulation w/ scattering due to water
 ![Screenshot from 2023-10-12 11-14-34](https://github.com/matthewaol/toysim/assets/51929639/df5d27a6-f171-4ed2-8579-892e725a06af)
 
 # instructions 
