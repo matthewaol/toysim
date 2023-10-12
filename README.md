@@ -1,6 +1,6 @@
 # x-ray diffraction data simulator
 simulation w/ scattering due to water
-![Uploading Screenshot from 2023-10-12 11-20-32.png…]()
+![Screenshot from 2023-10-12 11-20-32](https://github.com/matthewaol/toysim/assets/51929639/10e6b1f8-62d6-4fe3-80fb-ab44a07f588a)
 
 # instructions 
 clone the repository `git clone <url>`
