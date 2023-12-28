@@ -21,6 +21,6 @@ export PS1="[\w]\n$ "
 
 source ~/dials/dials
 ```
-5. after setting up environment, change directory to where your repostory is `cd ~/toysim`
+5. after setting up environment, change directory to where your repository is `cd ~/toysim`
 6. run this command for a sample protein structure: `iotbx.fetch_pdb 4bs7` 
 7. start simulating an image `python simulation.py` 
