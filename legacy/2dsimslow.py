@@ -1,8 +1,8 @@
 import simulation as sim 
-import bgnoise as bg
-import molecule
-import lattice
-import older
+import utilities.bgnoise as bg
+import utilities.molecule as molecule
+import utilities.lattice as lattice
+import legacy.older as older
 
 import pylab as plt 
 import numpy as np
@@ -14,9 +14,9 @@ from Bio.PDB.PDBParser import PDBParser
 from iotbx import pdb
 
 from cctbx import sgtbx
-import bgnoise
-import models
-import detectors
+import utilities.bgnoise as bgnoise
+import utilities.models as models
+import utilities.detectors as detectors
 from dxtbx.model.beam import BeamFactory
 from dxtbx.model.detector import DetectorFactory 
 
